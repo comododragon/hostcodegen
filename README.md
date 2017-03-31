@@ -17,6 +17,13 @@ See LICENSE file.
 * Python 3;
 * Any OpenCL installation (tested with Intel FPGA SDK for OpenCL).
 
+## Downloading the repo
+
+```
+$ git clone https://github.com/comododragon/hostcodegen.git
+$ git submodule update --init
+```
+
 ## How to Use (by Example)
 
 #### Describing your kernel in an XML file
@@ -46,7 +53,7 @@ All kernels to be executed by the host must be described on an XML file. An exam
 </kernels>
 ```
 
-Description for each tag and attributes is available on the file itself.
+Descriptions for each tag and attributes are available on the file itself.
 
 #### Generating host code
 
