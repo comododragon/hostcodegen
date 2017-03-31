@@ -1,0 +1,3 @@
+[submodule "aocl/include/common"]
+	path = aocl/include/common
+	url = https://github.com/comododragon/commonh

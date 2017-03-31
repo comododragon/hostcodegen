@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+	This is the root kernel. The following attributes are possible:
+		repeat: (optional) how many times input and output of nmemb > 1 should be replicated;
+		program: name of generated program file (e.g. for Intel FPGA OpenCL: program.aocx).
+-->
+<kernels repeat="5" program="program.aocx">
+	<!--
+		This is a kernel node. One or more may be provided. The following attributes are possible:
+			name: name of kernel function;
+			order: (optional) defines the order of execution between kernels. Lower means "run before".
+				If at least one kernel node provides order attribute, all kernels must provide it.
+	-->
+	<kernel name="add" order="1">
+		<!--
+			The ndrange node provides the ndrange information for this kernel. Attributes:
+				dim: dimension of ranges. This is the work_dim variable of clEnqueueNDRangeKernel.
+		-->
+		<ndrange dim="1">
+			<!-- Global work size, must provide dim values separated by commas -->
+			<global>50</global>
+			<!-- Local work size (optional), must provide dim values separated by commas -->
+			<!--<local>5</local>-->
+		</ndrange>
+		<!--
+			Input nodes provide input data for the kernel. The content of this tag is the input
+			data itself if no function attribute is set. Attributes:
+				name: variable name;
+				type: C-compatible type of variable;
+				nmemb: number of members. If nmemb = 1, variable will be directly passed to the
+					kernel without the use of cl_mem buffers;
+				arg: argument position for kernel. This is the arg_index value of clSetKernelArg.
+				function: (optional) if specified, input data will be retrieved from a function named by this attribute.
+					This function must be provided at compile-time on a separate source file. The function header must be:
+						void foo(type *array, int nmemb, int repeat); if nmemb > 1
+						type foo(void); if nmemb = 1
+		-->
+		<input name="a" type="float" nmemb="10" arg="0">9, 8, 7, 6, 5, 4, 3, 2, 1, 0</input>
+		<input name="b" type="float" nmemb="10" function="fillb" arg="1" />
+		<!--
+			Output nodes provide information of expected kernel's output. The content of this tag is the
+			expected output data to be validated if no function attribute is set. Attributes:
+				name: variable name;
+				type: C-compatible type of variable;
+				nmemb: number of members;
+				arg: argument position for kernel. This is the arg_index value of clSetKernelArg.
+				function: (optional) if specified, the validation output data will be retrieved from a function named by this attribute.
+					This function must be provided at compile-time on a separate source file. The function header must be:
+						void foo(type *array, int nmemb, int repeat); if nmemb > 1
+						type foo(void); if nmemb = 1
+		-->
+		<output name="c" type="float" nmemb="10" arg="2">9, 9, 9, 9, 9, 9, 9, 9, 9, 9</output>
+	</kernel>
+</kernels>
