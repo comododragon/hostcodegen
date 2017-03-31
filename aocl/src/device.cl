@@ -30,5 +30,5 @@
  */
 __kernel void add(__global float * restrict a, __global float * restrict b, __global float * restrict c) {
 	int i = get_global_id(0);
-	c[i] = a[i] * b[i];
+	c[i] = a[i] + b[i];
 }
