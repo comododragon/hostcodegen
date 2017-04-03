@@ -32,6 +32,37 @@ from xml.etree import ElementTree
 class CodeEmitter:
 	_targetFile = ""
 	_xmlRoot = ()
+	_printfMapper = {
+		"char": "c",
+		"signed char": "c",
+		"unsigned char": "c",
+		"short": "hd",
+		"short int": "hd",
+		"signed short": "hd",
+		"signed short int": "hd",
+		"unsigned short": "hu",
+		"unsigned short int": "hu",
+		"int": "d",
+		"signed": "d",
+		"signed int": "d",
+		"unsigned": "u",
+		"unsigned int": "u",
+		"long": "ld",
+		"long int": "ld",
+		"signed long": "ld",
+		"signed long int": "ld",
+		"unsigned long": "lu",
+		"unsigned long int": "lu",
+		"long long": "lld",
+		"long long int": "lld",
+		"signed long long": "lld",
+		"signed long long int": "lld",
+		"unsigned long long": "llu",
+		"unsigned long long int": "llu",
+		"float": "f",
+		"double": "lf",
+		"long double": "Lf"
+	}
 
 
 	def __init__(self, xmlFile, targetFile):
@@ -110,22 +141,40 @@ class CodeEmitter:
 			firstPrinted = False
 			for k in self._xmlRoot:
 				for v in k:
-					# If function attribute is present, the function prototype must be declared before main()
-					if "function" in v.attrib:
+					# If initialisation function attribute is present, the prototype must be declared before main()
+					if "initfn" in v.attrib:
 						if not firstPrinted:
 							f.write(
-								'/* Functions prototypes for input and/or output data */\n'
+								'/* Functions prototypes for initialisation and/or validation data */\n'
 							)
 							firstPrinted = True
 
 						if int(v.attrib["nmemb"]) > 1:
 							f.write(
-								'void {}({} *, int, int);\n'.format(v.attrib["function"], v.attrib["type"])
+								'void {}({} *, int, int);\n'.format(v.attrib["initfn"], v.attrib["type"])
 							)
 						else:
 							f.write(
-								'{} {}(void);\n'.format(v.attrib["type"], v.attrib["function"])
+								'{} {}(void);\n'.format(v.attrib["type"], v.attrib["initfn"])
 							)
+
+					# If validation function attribute is present, the prototype must be declared before main()
+					if "validfn" in v.attrib:
+						if not firstPrinted:
+							f.write(
+								'/* Functions prototypes for initialisation and/or validation data */\n'
+							)
+							firstPrinted = True
+
+						if int(v.attrib["nmemb"]) > 1:
+							f.write(
+								'void {}({} *, int, int);\n'.format(v.attrib["validfn"], v.attrib["type"])
+							)
+						else:
+							f.write(
+								'{} {}(void);\n'.format(v.attrib["type"], v.attrib["validfn"])
+							)
+
 			if firstPrinted:
 				f.write('\n')
 
@@ -241,57 +290,31 @@ class CodeEmitter:
 			# Iterate through every variable of every kernel
 			for k in self._xmlRoot:
 				for v in k:
-					# Function is being used instead of explicit variable assignment
-					if "function" in v.attrib:
-						# Declare variable, its opencl buffer and call the function to assign values to variable
-						if "input" == v.tag:
-							if int(v.attrib["nmemb"]) > 1:
-								f.write(
-									'	{0} {1}[{2}{3}];\n'
-									'	cl_mem {1}K = NULL;\n'
-									'	{4}({1}, {2}, {5});\n'.format(
-										v.attrib["type"],
-										v.attrib["name"],
-										v.attrib["nmemb"],
-										multiplierStr,
-										v.attrib["function"],
-										repeatCnt
-									)
-								)
-							else:
-								f.write(
-									'	{0} {1} = {2}();\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["function"])
-								)
-						# Declare variable, its opencl buffer and call the function to assign values to validation variable
-						elif "output" == v.tag:
+					if "input" == v.tag:
+						# Part 1: Host variable
+						# Function is being used instead of explicit variable initialisation
+						if "initfn" in v.attrib:
 							if int(v.attrib["nmemb"]) > 1:
 								f.write(
 									(
 										'	{0} {1}[{2}{3}];\n'
-										'	cl_mem {1}K = NULL;\n'
-										'	{0} {1}C[{2}{3}];\n'
-										'	{4}({1}C, {2}, {5});\n'.format(
+										'	{4}({1}, {2}, {5});\n'.format
+										(
 											v.attrib["type"],
 											v.attrib["name"],
 											v.attrib["nmemb"],
 											multiplierStr,
-											v.attrib["function"],
+											v.attrib["initfn"],
 											repeatCnt
 										)
 									)
 								)
 							else:
 								f.write(
-									(
-										'	{0} {1};\n'
-										'	cl_mem {1}K;\n'
-										'	{0} {1}C = {2}();\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["function"])
-									)
+									'	{0} {1} = {2}();\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["initfn"])
 								)
-					# Explicit variable assignment
-					else:
-						# Declare variable, assign values to it and declare its opencl buffer
-						if "input" == v.tag:
+						# Explicit variable initialisation
+						else:
 							if int(v.attrib["nmemb"]) > 1:
 								f.write(
 									'	{} {}[{}{}] = {{\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"], multiplierStr)
@@ -303,59 +326,99 @@ class CodeEmitter:
 									)
 
 								f.write(
-									(
-										'	}};\n'
-										'	cl_mem {}K = NULL;\n'.format(v.attrib["name"])
-									)
+									'	};\n'
 								)
 							else:
 								f.write(
 									'	{} {} = {};\n'.format(v.attrib["type"], v.attrib["name"], v.text)
 								)
-						# Declare variable, assign values to its validation variable and declare its opencl buffer
-						elif "output" == v.tag:
+
+						# Part 2: Device variable
+						if int(v.attrib["nmemb"]) > 1:
+							f.write(
+								'	cl_mem {}K = NULL;\n'.format(v.attrib["name"])
+							)
+					elif "output" == v.tag:
+						# Part 1: Host variable
+						# Function is being used for initialisation
+						if "initfn" in v.attrib:
 							if int(v.attrib["nmemb"]) > 1:
 								f.write(
 									(
 										'	{0} {1}[{2}{3}];\n'
-										'	cl_mem {1}K = NULL;\n'.format(
+										'	{4}({1}, {2}, {5});\n'.format
+										(
 											v.attrib["type"],
 											v.attrib["name"],
 											v.attrib["nmemb"],
-											multiplierStr
+											multiplierStr,
+											v.attrib["initfn"],
+											repeatCnt
 										)
 									)
 								)
-								if v.text is not None:
-									f.write(
-										'	{} {}C[{}{}] = {{\n'.format(
-											v.attrib["type"],
-											v.attrib["name"],
-											v.attrib["nmemb"],
-											multiplierStr
-										)
-									)
-
-									for x in range(0, repeatCnt):
-										f.write(
-											'		{}{}\n'.format(v.text, "" if x == (repeatCnt - 1) else ",")
-										)
-
-									f.write(
-										'	};\n'
-									)
 							else:
 								f.write(
-									(
-										'	{0} {1};\n'
-										'	cl_mem {1}K;\n'.format(v.attrib["type"], v.attrib["name"])
-									)
+									'	{0} {1} = {2}();\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["initfn"])
+								)
+						# For output, initialisation data must come from initfunction. If initfunction is not supplied, no
+						# initialisation is done
+						else:
+							if int(v.attrib["nmemb"]) > 1:
+								f.write(
+									'	{} {}[{}{}];\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"], multiplierStr)
+								)
+							else:
+								f.write(
+									'	{} {};\n'.format(v.attrib["type"], v.attrib["name"])
 								)
 
-								if v.text is not None:
-									f.write(
-										'	{} {}C = {};\n'.format(v.attrib["type"], v.attrib["name"], v.text)
+						# Part 2: Validation variable
+						# Function is being used instead of explicit validation variable assignment
+						if "validfn" in v.attrib:
+							if int(v.attrib["nmemb"]) > 1:
+								f.write(
+									(
+										'	{0} {1}C[{2}{3}];\n'
+										'	{4}({1}C, {2}, {5});\n'.format
+										(
+											v.attrib["type"],
+											v.attrib["name"],
+											v.attrib["nmemb"],
+											multiplierStr,
+											v.attrib["validfn"],
+											repeatCnt
+										)
 									)
+								)
+							else:
+								f.write(
+									'	{0} {1}C = {2}();\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["infunction"])
+								)
+						# Explicit variable assignment
+						else:
+							if int(v.attrib["nmemb"]) > 1:
+								f.write(
+									'	{} {}C[{}{}] = {{\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"], multiplierStr)
+								)
+
+								for x in range(0, repeatCnt):
+									f.write(
+										'		{}{}\n'.format(v.text, "" if x == (repeatCnt - 1) else ",")
+									)
+
+								f.write(
+									'	};\n'
+								)
+							else:
+								f.write(
+									'	{} {}C = {};\n'.format(v.attrib["type"], v.attrib["name"], v.text)
+								)
+
+						# Part 3: Device variable
+						f.write(
+							'	cl_mem {}K = NULL;\n'.format(v.attrib["name"])
+						)
 
 
 	# Print clGetPlatformIDs section
@@ -718,7 +781,7 @@ class CodeEmitter:
 
 			for k in self._xmlRoot:
 				for v in k:
-					if "output" == v.tag and v.text is not None:
+					if "output" == v.tag and ((v.text is not None) or ("validfn" in v.attrib)):
 						if int(v.attrib["nmemb"]) > 1:
 							f.write(
 								(
@@ -728,12 +791,13 @@ class CodeEmitter:
 									'				PRINT_FAIL();\n'
 									'				invalidDataFound = true;\n'
 									'			}}\n'
-									'			printf("Variable {2}[%d]: Expected %x got %x.\\n", i, {2}C[i], {2}[i]);\n'
+									'			printf("Variable {2}[%d]: Expected %{3} got %{3}.\\n", i, {2}C[i], {2}[i]);\n'
 									'		}}\n'
 									'	}}\n'.format(
 										v.attrib["nmemb"],
 										multiplierStr,
-										v.attrib["name"]
+										v.attrib["name"],
+										self._printfMapper[v.attrib["type"]] if v.attrib["type"] in self._printfMapper else "x"
 									)
 								)
 							)
@@ -745,8 +809,11 @@ class CodeEmitter:
 									'			PRINT_FAIL();\n'
 									'			invalidDataFound = true;\n'
 									'		}}\n'
-									'		printf("Variable {0}: Expected %x got %x.\\n", i, {0}C, {0});\n'
-									'	}}\n'.format(v.attrib["name"])
+									'		printf("Variable {0}: Expected %{1} got %{1}.\\n", i, {0}C, {0});\n'
+									'	}}\n'.format(
+										v.attrib["name"],
+										self._printfMapper[v.attrib["type"]] if v.attrib["type"] in self._printfMapper else "x"
+									)
 								)
 							)
 

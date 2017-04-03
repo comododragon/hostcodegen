@@ -28,7 +28,8 @@
  * @param b Second operand.
  * @param c Resulting vector.
  */
-__kernel void add(__global float * restrict a, __global float * restrict b, __global float * restrict c) {
+__kernel void add(__global float * restrict a, __global float * restrict b, __global float * restrict c, __global float * restrict d) {
 	int i = get_global_id(0);
 	c[i] = a[i] + b[i];
+	d[i] += c[i];
 }

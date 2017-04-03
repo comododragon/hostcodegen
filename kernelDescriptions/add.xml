@@ -24,31 +24,36 @@
 		</ndrange>
 		<!--
 			Input nodes provide input data for the kernel. The content of this tag is the input
-			data itself if no function attribute is set. Attributes:
+			data itself if no initfn attribute is set. Attributes:
 				name: variable name;
 				type: C-compatible type of variable;
 				nmemb: number of members. If nmemb = 1, variable will be directly passed to the
 					kernel without the use of cl_mem buffers;
-				arg: argument position for kernel. This is the arg_index value of clSetKernelArg.
-				function: (optional) if specified, input data will be retrieved from a function named by this attribute.
+				arg: argument position for kernel. This is the arg_index value of clSetKernelArg;
+				initfn: (optional) if specified, input data will be retrieved from a function named by this attribute.
 					This function must be provided at compile-time on a separate source file. The function header must be:
 						void foo(type *array, int nmemb, int repeat); if nmemb > 1
 						type foo(void); if nmemb = 1
 		-->
 		<input name="a" type="float" nmemb="10" arg="0">9, 8, 7, 6, 5, 4, 3, 2, 1, 0</input>
-		<input name="b" type="float" nmemb="10" function="fillb" arg="1" />
+		<input name="b" type="float" nmemb="10" initfn="fillb" arg="1" />
 		<!--
 			Output nodes provide information of expected kernel's output. The content of this tag is the
-			expected output data to be validated if no function attribute is set. Attributes:
+			expected output data to be validated if no validfn attribute is set. Attributes:
 				name: variable name;
 				type: C-compatible type of variable;
 				nmemb: number of members;
-				arg: argument position for kernel. This is the arg_index value of clSetKernelArg.
-				function: (optional) if specified, the validation output data will be retrieved from a function named by this attribute.
+				arg: argument position for kernel. This is the arg_index value of clSetKernelArg;
+				initfn: (optional) if specified, input data will be retrieved from a function named by this attribute.
+					This function must be provided at compile-time on a separate source file. The function header must be:
+						void foo(type *array, int nmemb, int repeat); if nmemb > 1
+						type foo(void); if nmemb = 1
+				validfn: (optional) if specified, the validation output data will be retrieved from a function named by this attribute.
 					This function must be provided at compile-time on a separate source file. The function header must be:
 						void foo(type *array, int nmemb, int repeat); if nmemb > 1
 						type foo(void); if nmemb = 1
 		-->
 		<output name="c" type="float" nmemb="10" arg="2">9, 9, 9, 9, 9, 9, 9, 9, 9, 9</output>
+		<output name="d" type="float" nmemb="10" initfn="filld" validfn="validationd" arg="3" />
 	</kernel>
 </kernels>
