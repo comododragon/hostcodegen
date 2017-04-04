@@ -2,7 +2,7 @@
 <!--
 	This is the root kernel. The following attributes are possible:
 		program: name of generated program file (e.g. for Intel FPGA OpenCL: program.aocx);
-		preamble: (optional) if specified, all input data without explicit initialisation or output data
+		preamble: (optional) if specified, all input/output data without explicit initialisation or output data
 			without explicit validation variables will be passed as argument for custom initial logic.
 			Suppose if inputs a and b must be initialised and output c (ints) must have its validation initialised
 			and the "preamble" attribute is "foobar". The function would be:
@@ -15,7 +15,7 @@
 					bSz: number of members in array pointed by b;
 					cC: pointer to output validation variable of output c;
 					cCSz: number of members in array pointed by cC.
-		postamble: (optional) if specified, all input data without explicit initialisation or output data
+		postamble: (optional) if specified, all input/output data without explicit initialisation or output data
 			without explicit validation variables will be passed as argument for custom final logic (free data, etc.).
 			The postamble function header is similar to preamble's (see previous example), except for return value,
 			which is void.
@@ -59,7 +59,8 @@
 				nmemb: number of members;
 				arg: argument position for kernel. This is the arg_index value of clSetKernelArg;
 				init: (optional) if "true", this variable will be passed as argument to preamble/postamble
-					functions for initialisation.
+					functions for initialisation;
+				novalidation: (optional) if "true", validation variable ("<varname>C") will not be generated.
 		-->
 		<output name="c" type="float" nmemb="10" arg="2">9, 9, 9, 9, 9, 9, 9, 9, 9, 9</output>
 		<output name="d" type="float" nmemb="10" arg="3" init="true" />

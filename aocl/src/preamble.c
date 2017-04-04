@@ -32,5 +32,7 @@ int prevars(float *b, unsigned int bSz, float *d, unsigned int dSz, float *dC, u
 		d[i] = 1;
 
 	for(i = 0; i < dCSz; i++)
-		dCSz[i] = 10;
+		dC[i] = 10;
+
+	return 0;
 }

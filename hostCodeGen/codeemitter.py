@@ -153,7 +153,7 @@ class CodeEmitter:
 							self._varTypeList.append("unsigned int")
 							self._varNameList.append(v.attrib["nmemb"])
 
-						if v.text is None:
+						if v.text is None and (("novalidation" not in v.attrib) or (v.attrib["novalidation"] != "true")):
 							self._varTypeList.append("{}{}".format(v.attrib["type"], " *" if int(v.attrib["nmemb"]) > 1 else ""))
 							self._varNameList.append("{}{}C".format("" if int(v.attrib["nmemb"]) > 1 else "&", v.attrib["name"]))
 							self._varTypeList.append("unsigned int")
@@ -344,30 +344,31 @@ class CodeEmitter:
 							)
 
 						# Part 2: Validation variable
-						# Function is being used instead of explicit validation variable assignment
-						if v.text is None:
-							if int(v.attrib["nmemb"]) > 1:
-								f.write(
-									'	{} {}C[{}];\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"])
-								)
-							else:
-								f.write(
-									'	{} {}C;\n'.format(v.attrib["type"], v.attrib["name"])
-								)
-						# Explicit variable assignment
-						else:
-							if int(v.attrib["nmemb"]) > 1:
-								f.write(
-									(
-										'	{} {}C[{}] = {{\n'
-										'		{}\n'
-										'	}};\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"], v.text)
+						if ("novalidation" not in v.attrib) or (v.attrib["novalidation"] != "true"):
+							# Function is being used instead of explicit validation variable assignment
+							if v.text is None:
+								if int(v.attrib["nmemb"]) > 1:
+									f.write(
+										'	{} {}C[{}];\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"])
 									)
-								)
+								else:
+									f.write(
+										'	{} {}C;\n'.format(v.attrib["type"], v.attrib["name"])
+									)
+							# Explicit variable assignment
 							else:
-								f.write(
-									'	{} {}C = {};\n'.format(v.attrib["type"], v.attrib["name"], v.text)
-								)
+								if int(v.attrib["nmemb"]) > 1:
+									f.write(
+										(
+											'	{} {}C[{}] = {{\n'
+											'		{}\n'
+											'	}};\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"], v.text)
+										)
+									)
+								else:
+									f.write(
+										'	{} {}C = {};\n'.format(v.attrib["type"], v.attrib["name"], v.text)
+									)
 
 						# Part 3: Device variable
 						f.write(
@@ -726,7 +727,7 @@ class CodeEmitter:
 
 			for k in self._xmlRoot:
 				for v in k:
-					if "output" == v.tag and ((v.text is not None) or ("validfn" in v.attrib)):
+					if ("output" == v.tag) and (("novalidation" not in v.attrib) or (v.attrib["novalidation"] != "true")):
 						if int(v.attrib["nmemb"]) > 1:
 							f.write(
 								(

@@ -27,6 +27,7 @@
  * @param a First operand.
  * @param b Second operand.
  * @param c Resulting vector.
+ * @param d Another resulting vector.
  */
 __kernel void add(__global float * restrict a, __global float * restrict b, __global float * restrict c, __global float * restrict d) {
 	int i = get_global_id(0);
