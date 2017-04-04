@@ -25,17 +25,17 @@
 GENERALFLAGS=-fPIC -DCOMMON_COLOURED_PRINTS -Iinclude/common
 AOCLFLAGS=`aocl compile-config` `aocl link-config`
 
-emu/emulate: include/common/common.h src/host.c src/fillb.c src/filld.c src/validationd.c emu/program.aocx
+emu/emulate: include/common/common.h src/host.c src/preamble.c emu/program.aocx
 	mkdir -p emu
-	$(CC) src/host.c src/fillb.c src/filld.c src/validationd.c -o emu/emulate $(GENERALFLAGS) $(AOCLFLAGS)
+	$(CC) src/host.c src/preamble.c -o emu/emulate $(GENERALFLAGS) $(AOCLFLAGS)
 
 emu/program.aocx: src/device.cl
 	mkdir -p emu
 	aoc -v -march=emulator -g --board s5phq_a7 src/device.cl -o emu/program.aocx
 
-bin/execute: include/common/common.h src/host.c src/fillb.c src/filld.c src/validationd.c bin/program.aocx
+bin/execute: include/common/common.h src/host.c src/preamble.c bin/program.aocx
 	mkdir -p bin
-	$(CC) src/host.c src/fillb.c src/filld.c src/validationd.c -o bin/execute $(GENERALFLAGS) $(AOCLFLAGS)
+	$(CC) src/host.c src/preamble.c -o bin/execute $(GENERALFLAGS) $(AOCLFLAGS)
 
 bin/program.aocx: src/device.cl
 	mkdir -p bin

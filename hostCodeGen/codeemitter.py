@@ -32,6 +32,8 @@ from xml.etree import ElementTree
 class CodeEmitter:
 	_targetFile = ""
 	_xmlRoot = ()
+	_varTypeList = []
+	_varNameList = []
 	_printfMapper = {
 		"char": "c",
 		"signed char": "c",
@@ -113,14 +115,14 @@ class CodeEmitter:
 					'#include "common.h"\n'
 					'\n'
 					'/**\n'
-					' * @brief Standard statements for OpenCL error handling and printing.\n'
+					' * @brief Standard statements for function error handling and printing.\n'
 					' *\n'
 					' * @param funcName Function name that failed.\n'
 					' */\n'
-					'#define CL_ERROR_STATEMENTS(funcName) {\\\n'
+					'#define FUNCTION_ERROR_STATEMENTS(funcName) {\\\n'
 					'	rv = EXIT_FAILURE;\\\n'
 					'	PRINT_FAIL();\\\n'
-					'	fprintf(stderr, "Error: %s failed with return code %d.\\n", funcName, clRet);\\\n'
+					'	fprintf(stderr, "Error: %s failed with return code %d.\\n", funcName, fRet);\\\n'
 					'}\n'
 					'\n'
 					'/**\n'
@@ -137,54 +139,64 @@ class CodeEmitter:
 				)
 			)
 
-			# Iterate through every variable declaration
-			firstPrinted = False
 			for k in self._xmlRoot:
 				for v in k:
-					# If initialisation function attribute is present, the prototype must be declared before main()
-					if "initfn" in v.attrib:
-						if not firstPrinted:
-							f.write(
-								'/* Functions prototypes for initialisation and/or validation data */\n'
-							)
-							firstPrinted = True
+					if "input" == v.tag and v.text is None:
+						self._varTypeList.append("{}{}".format(v.attrib["type"], " *" if int(v.attrib["nmemb"]) > 1 else ""))
+						self._varNameList.append("{}{}".format("" if int(v.attrib["nmemb"]) > 1 else "&", v.attrib["name"]))
+						self._varTypeList.append("unsigned int")
+						self._varNameList.append(v.attrib["nmemb"])
+					elif "output" == v.tag:
+						if "init" in v.attrib and "true" == v.attrib["init"]:
+							self._varTypeList.append("{}{}".format(v.attrib["type"], " *" if int(v.attrib["nmemb"]) > 1 else ""))
+							self._varNameList.append("{}{}".format("" if int(v.attrib["nmemb"]) > 1 else "&", v.attrib["name"]))
+							self._varTypeList.append("unsigned int")
+							self._varNameList.append(v.attrib["nmemb"])
 
-						if int(v.attrib["nmemb"]) > 1:
-							f.write(
-								'void {}({} *, int, int);\n'.format(v.attrib["initfn"], v.attrib["type"])
-							)
-						else:
-							f.write(
-								'{} {}(void);\n'.format(v.attrib["type"], v.attrib["initfn"])
-							)
+						if v.text is None:
+							self._varTypeList.append("{}{}".format(v.attrib["type"], " *" if int(v.attrib["nmemb"]) > 1 else ""))
+							self._varNameList.append("{}{}C".format("" if int(v.attrib["nmemb"]) > 1 else "&", v.attrib["name"]))
+							self._varTypeList.append("unsigned int")
+							self._varNameList.append(v.attrib["nmemb"])
 
-					# If validation function attribute is present, the prototype must be declared before main()
-					if "validfn" in v.attrib:
-						if not firstPrinted:
-							f.write(
-								'/* Functions prototypes for initialisation and/or validation data */\n'
-							)
-							firstPrinted = True
+			if len(self._varTypeList) > 0:
+				f.write(
+					(
+						'/**\n'
+						' * @brief Functions prototypes for initialisation and/or validation data.\n'
+						' *        List of parameters:\n'
+					)
+				)
 
-						if int(v.attrib["nmemb"]) > 1:
-							f.write(
-								'void {}({} *, int, int);\n'.format(v.attrib["validfn"], v.attrib["type"])
-							)
-						else:
-							f.write(
-								'{} {}(void);\n'.format(v.attrib["type"], v.attrib["validfn"])
-							)
+				for i in range(0, len(self._varTypeList)):
+					f.write(
+						' *            {} ({})\n'.format(self._varNameList[i], self._varTypeList[i])
+					)
 
-			if firstPrinted:
+				f.write(
+					' */\n'
+				)
+
+				if "preamble" in self._xmlRoot.attrib:
+					f.write(
+						'int {}({});\n'.format(self._xmlRoot.attrib["preamble"], ', '.join(self._varTypeList))
+					)
+				if "postamble" in self._xmlRoot.attrib:
+					f.write(
+						'void {}({});\n'.format(self._xmlRoot.attrib["postamble"], ', '.join(self._varTypeList))
+					)
+
 				f.write('\n')
 
 			f.write(
 				(
 					'int main(void) {\n'
+					'	/* Return variable */\n'
 					'	int rv = EXIT_SUCCESS;\n'
 					'\n'
+					'	/* OpenCL and aux variables */\n'
 					'	int i;\n'
-					'	cl_int platformsLen, devicesLen, clRet;\n'
+					'	cl_int platformsLen, devicesLen, fRet;\n'
 					'	cl_platform_id *platforms = NULL;\n'
 					'	cl_device_id *devices = NULL;\n'
 					'	cl_context context = NULL;\n'
@@ -279,13 +291,9 @@ class CodeEmitter:
 	# Print declaration of inputs and outputs of kernels
 	def printVariablesDeclaration(self):
 		with open(self._targetFile, "a") as f:
-			# Configure multiplier string
-			if "repeat" in self._xmlRoot.attrib:
-				repeatCnt = int(self._xmlRoot.attrib["repeat"])
-				multiplierStr = " * {}".format(repeatCnt)
-			else:
-				repeatCnt = 1
-				multiplierStr = ""
+			f.write(
+				'	/* Input/output variables */\n'
+			)
 
 			# Iterate through every variable of every kernel
 			for k in self._xmlRoot:
@@ -293,40 +301,24 @@ class CodeEmitter:
 					if "input" == v.tag:
 						# Part 1: Host variable
 						# Function is being used instead of explicit variable initialisation
-						if "initfn" in v.attrib:
+						if v.text is None:
 							if int(v.attrib["nmemb"]) > 1:
 								f.write(
-									(
-										'	{0} {1}[{2}{3}];\n'
-										'	{4}({1}, {2}, {5});\n'.format
-										(
-											v.attrib["type"],
-											v.attrib["name"],
-											v.attrib["nmemb"],
-											multiplierStr,
-											v.attrib["initfn"],
-											repeatCnt
-										)
-									)
+									'	{} {}[{}];\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"])
 								)
 							else:
 								f.write(
-									'	{0} {1} = {2}();\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["initfn"])
+									'	{} {};\n'.format(v.attrib["type"], v.attrib["name"])
 								)
 						# Explicit variable initialisation
 						else:
 							if int(v.attrib["nmemb"]) > 1:
 								f.write(
-									'	{} {}[{}{}] = {{\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"], multiplierStr)
-								)
-
-								for x in range(0, repeatCnt):
-									f.write(
-										'		{}{}\n'.format(v.text, "" if x == (repeatCnt - 1) else ",")
+									(
+										'	{} {}[{}] = {{\n'
+										'		{}\n'
+										'	}};\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"], v.text)
 									)
-
-								f.write(
-									'	};\n'
 								)
 							else:
 								f.write(
@@ -340,75 +332,37 @@ class CodeEmitter:
 							)
 					elif "output" == v.tag:
 						# Part 1: Host variable
-						# Function is being used for initialisation
-						if "initfn" in v.attrib:
-							if int(v.attrib["nmemb"]) > 1:
-								f.write(
-									(
-										'	{0} {1}[{2}{3}];\n'
-										'	{4}({1}, {2}, {5});\n'.format
-										(
-											v.attrib["type"],
-											v.attrib["name"],
-											v.attrib["nmemb"],
-											multiplierStr,
-											v.attrib["initfn"],
-											repeatCnt
-										)
-									)
-								)
-							else:
-								f.write(
-									'	{0} {1} = {2}();\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["initfn"])
-								)
 						# For output, initialisation data must come from initfunction. If initfunction is not supplied, no
 						# initialisation is done
+						if int(v.attrib["nmemb"]) > 1:
+							f.write(
+								'	{} {}[{}];\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"])
+							)
 						else:
-							if int(v.attrib["nmemb"]) > 1:
-								f.write(
-									'	{} {}[{}{}];\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"], multiplierStr)
-								)
-							else:
-								f.write(
-									'	{} {};\n'.format(v.attrib["type"], v.attrib["name"])
-								)
+							f.write(
+								'	{} {};\n'.format(v.attrib["type"], v.attrib["name"])
+							)
 
 						# Part 2: Validation variable
 						# Function is being used instead of explicit validation variable assignment
-						if "validfn" in v.attrib:
+						if v.text is None:
 							if int(v.attrib["nmemb"]) > 1:
 								f.write(
-									(
-										'	{0} {1}C[{2}{3}];\n'
-										'	{4}({1}C, {2}, {5});\n'.format
-										(
-											v.attrib["type"],
-											v.attrib["name"],
-											v.attrib["nmemb"],
-											multiplierStr,
-											v.attrib["validfn"],
-											repeatCnt
-										)
-									)
+									'	{} {}C[{}];\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"])
 								)
 							else:
 								f.write(
-									'	{0} {1}C = {2}();\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["infunction"])
+									'	{} {}C;\n'.format(v.attrib["type"], v.attrib["name"])
 								)
 						# Explicit variable assignment
 						else:
 							if int(v.attrib["nmemb"]) > 1:
 								f.write(
-									'	{} {}C[{}{}] = {{\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"], multiplierStr)
-								)
-
-								for x in range(0, repeatCnt):
-									f.write(
-										'		{}{}\n'.format(v.text, "" if x == (repeatCnt - 1) else ",")
+									(
+										'	{} {}C[{}] = {{\n'
+										'		{}\n'
+										'	}};\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"], v.text)
 									)
-
-								f.write(
-									'	};\n'
 								)
 							else:
 								f.write(
@@ -420,6 +374,16 @@ class CodeEmitter:
 							'	cl_mem {}K = NULL;\n'.format(v.attrib["name"])
 						)
 
+			if "preamble" in self._xmlRoot.attrib:
+				f.write(
+					'\n'
+					'	/* Calling preamble function */\n'
+					'	PRINT_STEP("Calling preamble function...");\n'
+					'	fRet = {}({});\n'
+					'	ASSERT_CALL(0 == fRet, FUNCTION_ERROR_STATEMENTS("preamble"));\n'
+					'	PRINT_SUCCESS();\n'.format(self._xmlRoot.attrib["preamble"], ', '.join(self._varNameList))
+				)
+
 
 	# Print clGetPlatformIDs section
 	def printGetPlatformIDs(self):
@@ -428,11 +392,11 @@ class CodeEmitter:
 				(
 					'	/* Get platforms IDs */\n'
 					'	PRINT_STEP("Getting platforms IDs...");\n'
-					'	clRet = clGetPlatformIDs(0, NULL, &platformsLen);\n'
-					'	ASSERT_CALL(CL_SUCCESS == clRet, CL_ERROR_STATEMENTS("clGetPlatformIDs"));\n'
+					'	fRet = clGetPlatformIDs(0, NULL, &platformsLen);\n'
+					'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clGetPlatformIDs"));\n'
 					'	platforms = malloc(platformsLen * sizeof(cl_platform_id));\n'
-					'	clRet = clGetPlatformIDs(platformsLen, platforms, NULL);\n'
-					'	ASSERT_CALL(CL_SUCCESS == clRet, CL_ERROR_STATEMENTS("clGetPlatformIDs"));\n'
+					'	fRet = clGetPlatformIDs(platformsLen, platforms, NULL);\n'
+					'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clGetPlatformIDs"));\n'
 					'	PRINT_SUCCESS();\n'
 				)
 			)
@@ -445,11 +409,11 @@ class CodeEmitter:
 				(
 					'	/* Get devices IDs for first platform availble */\n'
 					'	PRINT_STEP("Getting devices IDs for first platform...");\n'
-					'	clRet = clGetDeviceIDs(platforms[0], CL_DEVICE_TYPE_ACCELERATOR, 0, NULL, &devicesLen);\n'
-					'	ASSERT_CALL(CL_SUCCESS == clRet, CL_ERROR_STATEMENTS("clGetDevicesIDs"));\n'
+					'	fRet = clGetDeviceIDs(platforms[0], CL_DEVICE_TYPE_ACCELERATOR, 0, NULL, &devicesLen);\n'
+					'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clGetDevicesIDs"));\n'
 					'	devices = malloc(devicesLen * sizeof(cl_device_id));\n'
-					'	clRet = clGetDeviceIDs(platforms[0], CL_DEVICE_TYPE_ACCELERATOR, devicesLen, devices, NULL);\n'
-					'	ASSERT_CALL(CL_SUCCESS == clRet, CL_ERROR_STATEMENTS("clGetDevicesIDs"));\n'
+					'	fRet = clGetDeviceIDs(platforms[0], CL_DEVICE_TYPE_ACCELERATOR, devicesLen, devices, NULL);\n'
+					'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clGetDevicesIDs"));\n'
 					'	PRINT_SUCCESS();\n'
 				)
 			)
@@ -462,8 +426,8 @@ class CodeEmitter:
 				(
 					'	/* Create context for first available device */\n'
 					'	PRINT_STEP("Creating context...");\n'
-					'	context = clCreateContext(NULL, 1, devices, NULL, NULL, &clRet);\n'
-					'	ASSERT_CALL(CL_SUCCESS == clRet, CL_ERROR_STATEMENTS("clCreateContext"));\n'
+					'	context = clCreateContext(NULL, 1, devices, NULL, NULL, &fRet);\n'
+					'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateContext"));\n'
 					'	PRINT_SUCCESS();\n'
 				)
 			)
@@ -477,8 +441,8 @@ class CodeEmitter:
 					(
 						'	/* Create command queue for {0} kernel */\n'
 						'	PRINT_STEP("Creating command queue for \\"{0}\\"...");\n'
-						'	queue{1} = clCreateCommandQueue(context, devices[0], 0, &clRet);\n'
-						'	ASSERT_CALL(CL_SUCCESS == clRet, CL_ERROR_STATEMENTS("clCreateCommandQueue"));\n'
+						'	queue{1} = clCreateCommandQueue(context, devices[0], 0, &fRet);\n'
+						'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateCommandQueue"));\n'
 						'	PRINT_SUCCESS();\n'.format(k.attrib["name"], k.attrib["name"].title())
 					)
 				)
@@ -508,15 +472,15 @@ class CodeEmitter:
 					'\n'
 					'	/* Create program from aocx file */\n'
 					'	PRINT_STEP("Creating program from binary...");\n'
-					'	program = clCreateProgramWithBinary(context, 1, devices, &programSz, (const unsigned char **) &programBin, &programRet, &clRet);\n'
-					'	ASSERT_CALL(CL_SUCCESS == programRet, CL_ERROR_STATEMENTS("clCreateProgramWithBinary (when loading aocx)"));\n'
-					'	ASSERT_CALL(CL_SUCCESS == clRet, CL_ERROR_STATEMENTS("clCreateProgramWithBinary"));\n'
+					'	program = clCreateProgramWithBinary(context, 1, devices, &programSz, (const unsigned char **) &programBin, &programRet, &fRet);\n'
+					'	ASSERT_CALL(CL_SUCCESS == programRet, FUNCTION_ERROR_STATEMENTS("clCreateProgramWithBinary (when loading aocx)"));\n'
+					'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateProgramWithBinary"));\n'
 					'	PRINT_SUCCESS();\n'
 					'\n'
 					'	/* Build program */\n'
 					'	PRINT_STEP("Building program...");\n'
-					'	clRet = clBuildProgram(program, 1, devices, NULL, NULL, NULL);\n'
-					'	ASSERT_CALL(CL_SUCCESS == clRet, CL_ERROR_STATEMENTS("clBuildProgram"));\n'
+					'	fRet = clBuildProgram(program, 1, devices, NULL, NULL, NULL);\n'
+					'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clBuildProgram"));\n'
 					'	PRINT_SUCCESS();\n'.format(self._xmlRoot.attrib["program"])
 				)
 			)
@@ -530,8 +494,8 @@ class CodeEmitter:
 					(
 						'	/* Create {0} kernel */\n'
 						'	PRINT_STEP("Creating kernel \\"{0}\\" from program...");\n'
-						'	kernel{1} = clCreateKernel(program, "{0}", &clRet);\n'
-						'	ASSERT_CALL(CL_SUCCESS == clRet, CL_ERROR_STATEMENTS("clCreateKernel"));\n'
+						'	kernel{1} = clCreateKernel(program, "{0}", &fRet);\n'
+						'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateKernel"));\n'
 						'	PRINT_SUCCESS();\n'.format(k.attrib["name"], k.attrib["name"].title())
 					)
 				)
@@ -547,19 +511,16 @@ class CodeEmitter:
 				)
 			)
 
-			multiplierStr = " * {}".format(self._xmlRoot.attrib["repeat"]) if "repeat" in self._xmlRoot.attrib else ""
-
 			for k in self._xmlRoot:
 				for v in k:
 					if "input" == v.tag:
 						if int(v.attrib["nmemb"]) > 1:
 							f.write(
 								(
-									'	{0}K = clCreateBuffer(context, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY, {1}{2} * sizeof({3}), {0}, &clRet);\n'
-									'	ASSERT_CALL(CL_SUCCESS == clRet, CL_ERROR_STATEMENTS("clCreateBuffer ({0}K)"));\n'.format(
+									'	{0}K = clCreateBuffer(context, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY, {1} * sizeof({2}), {0}, &fRet);\n'
+									'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateBuffer ({0}K)"));\n'.format(
 										v.attrib["name"],
 										v.attrib["nmemb"],
-										multiplierStr,
 										v.attrib["type"]
 									)
 								)
@@ -568,11 +529,10 @@ class CodeEmitter:
 						if int(v.attrib["nmemb"]) > 1:
 							f.write(
 								(
-									'	{0}K = clCreateBuffer(context, CL_MEM_COPY_HOST_PTR, {1}{2} * sizeof({3}), {0}, &clRet);\n'
-									'	ASSERT_CALL(CL_SUCCESS == clRet, CL_ERROR_STATEMENTS("clCreateBuffer ({0}K)"));\n'.format(
+									'	{0}K = clCreateBuffer(context, CL_MEM_COPY_HOST_PTR, {1} * sizeof({2}), {0}, &fRet);\n'
+									'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateBuffer ({0}K)"));\n'.format(
 										v.attrib["name"],
 										v.attrib["nmemb"],
-										multiplierStr,
 										v.attrib["type"]
 									)
 								)
@@ -580,8 +540,8 @@ class CodeEmitter:
 						else:
 							f.write(
 								(
-									'	{0}K = clCreateBuffer(context, CL_MEM_COPY_HOST_PTR, {1} * sizeof({2}), &{0}, &clRet);\n'
-									'	ASSERT_CALL(CL_SUCCESS == clRet, CL_ERROR_STATEMENTS("clCreateBuffer ({0}K)"));\n'.format(
+									'	{0}K = clCreateBuffer(context, CL_MEM_COPY_HOST_PTR, {1} * sizeof({2}), &{0}, &fRet);\n'
+									'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateBuffer ({0}K)"));\n'.format(
 										v.attrib["name"],
 										v.attrib["nmemb"],
 										v.attrib["type"]
@@ -609,15 +569,15 @@ class CodeEmitter:
 					if "input" == v.tag and 1 == int(v.attrib["nmemb"]):
 						f.write(
 							(
-								'	clRet = clSetKernelArg(kernel{0}, {1}, sizeof({2}), &{3});\n'
-								'	ASSERT_CALL(CL_SUCCESS == clRet, CL_ERROR_STATEMENTS("clSetKernelArg ({3})"));\n'.format(k.attrib["name"].title(), v.attrib["arg"], v.attrib["type"], v.attrib["name"])
+								'	fRet = clSetKernelArg(kernel{0}, {1}, sizeof({2}), &{3});\n'
+								'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clSetKernelArg ({3})"));\n'.format(k.attrib["name"].title(), v.attrib["arg"], v.attrib["type"], v.attrib["name"])
 							)
 						)
 					elif "input" == v.tag or "output" == v.tag:
 						f.write(
 							(
-								'	clRet = clSetKernelArg(kernel{0}, {1}, sizeof(cl_mem), &{2}K);\n'
-								'	ASSERT_CALL(CL_SUCCESS == clRet, CL_ERROR_STATEMENTS("clSetKernelArg ({2}K)"));\n'.format(k.attrib["name"].title(), v.attrib["arg"], v.attrib["name"])
+								'	fRet = clSetKernelArg(kernel{0}, {1}, sizeof(cl_mem), &{2}K);\n'
+								'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clSetKernelArg ({2}K)"));\n'.format(k.attrib["name"].title(), v.attrib["arg"], v.attrib["name"])
 							)
 						)
 
@@ -679,8 +639,8 @@ class CodeEmitter:
 
 						f.write(
 							(
-								'	clRet = clEnqueueNDRangeKernel(queue{0}, kernel{0}, workDim{0}, NULL, globalSize{0}, {1}, {2}, {3}, {4});\n'
-								'	ASSERT_CALL(CL_SUCCESS == clRet, CL_ERROR_STATEMENTS("clEnqueueNDRangeKernel"));\n'.format(
+								'	fRet = clEnqueueNDRangeKernel(queue{0}, kernel{0}, workDim{0}, NULL, globalSize{0}, {1}, {2}, {3}, {4});\n'
+								'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clEnqueueNDRangeKernel"));\n'.format(
 									k.attrib["name"].title(),
 									localSize,
 									"0" if 0 == i else "1",
@@ -710,8 +670,8 @@ class CodeEmitter:
 
 					f.write(
 						(
-							'	clRet = clEnqueueNDRangeKernel(queue{0}, kernel{0}, workDim{0}, NULL, globalSize{0}, {1}, 0, NULL, NULL);\n'
-							'	ASSERT_CALL(CL_SUCCESS == clRet, CL_ERROR_STATEMENTS("clEnqueueNDRangeKernel"));\n'.format(
+							'	fRet = clEnqueueNDRangeKernel(queue{0}, kernel{0}, workDim{0}, NULL, globalSize{0}, {1}, 0, NULL, NULL);\n'
+							'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clEnqueueNDRangeKernel"));\n'.format(
 								k.attrib["name"].title(),
 								localSize
 							)
@@ -726,13 +686,6 @@ class CodeEmitter:
 	# Print clEnqueueReadBuffer section
 	def printEnqueueReadBuffer(self):
 		with open(self._targetFile, "a") as f:
-			if "repeat" in self._xmlRoot.attrib:
-				repeatCnt = int(self._xmlRoot.attrib["repeat"])
-				multiplierStr = " * {}".format(repeatCnt)
-			else:
-				repeatCnt = 1
-				multiplierStr = ""
-
 			f.write(
 				(
 					'	/* Get output buffers */\n'
@@ -744,11 +697,10 @@ class CodeEmitter:
 				for v in k:
 					if "output" == v.tag:
 						f.write(
-							'	clRet = clEnqueueReadBuffer(queue{0}, {1}K, CL_TRUE, 0, {2}{3} * sizeof({4}), {5}{1}, 0, NULL, NULL);\n'.format(
+							'	fRet = clEnqueueReadBuffer(queue{0}, {1}K, CL_TRUE, 0, {2} * sizeof({3}), {4}{1}, 0, NULL, NULL);\n'.format(
 								k.attrib["name"].title(),
 								v.attrib["name"],
 								v.attrib["nmemb"],
-								multiplierStr if int(v.attrib["nmemb"]) > 1 else "",
 								v.attrib["type"],
 								"" if int(v.attrib["nmemb"]) > 1 else "&"
 							)
@@ -756,7 +708,7 @@ class CodeEmitter:
 
 			f.write(
 				(
-					'	ASSERT_CALL(CL_SUCCESS == clRet, CL_ERROR_STATEMENTS("clEnqueueReadBuffer"));\n'
+					'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clEnqueueReadBuffer"));\n'
 					'	PRINT_SUCCESS();\n'
 				)
 			)
@@ -765,13 +717,6 @@ class CodeEmitter:
 	# Print code for output validation
 	def printValidation(self):
 		with open(self._targetFile, "a") as f:
-			if "repeat" in self._xmlRoot.attrib:
-				repeatCnt = int(self._xmlRoot.attrib["repeat"])
-				multiplierStr = " * {}".format(repeatCnt)
-			else:
-				repeatCnt = 1
-				multiplierStr = ""
-
 			f.write(
 				(
 					'	/* Validate received data */\n'
@@ -785,17 +730,16 @@ class CodeEmitter:
 						if int(v.attrib["nmemb"]) > 1:
 							f.write(
 								(
-									'	for(i = 0; i < {0}{1}; i++) {{\n'
-									'		if({2}C[i] != {2}[i]) {{\n'
+									'	for(i = 0; i < {0}; i++) {{\n'
+									'		if({1}C[i] != {1}[i]) {{\n'
 									'			if(!invalidDataFound) {{\n'
 									'				PRINT_FAIL();\n'
 									'				invalidDataFound = true;\n'
 									'			}}\n'
-									'			printf("Variable {2}[%d]: Expected %{3} got %{3}.\\n", i, {2}C[i], {2}[i]);\n'
+									'			printf("Variable {1}[%d]: Expected %{2} got %{2}.\\n", i, {1}C[i], {1}[i]);\n'
 									'		}}\n'
 									'	}}\n'.format(
 										v.attrib["nmemb"],
-										multiplierStr,
 										v.attrib["name"],
 										self._printfMapper[v.attrib["type"]] if v.attrib["type"] in self._printfMapper else "x"
 									)
@@ -836,6 +780,10 @@ class CodeEmitter:
 	# Print clReleaseMemObject section
 	def printFreeBuffers(self):
 		with open(self._targetFile, "a") as f:
+			f.write(
+				'	/* Dealloc buffers */\n'
+			)
+
 			for k in self._xmlRoot:
 				for v in k:
 					if ("input" == v.tag or "output" == v.tag) and int(v.attrib["nmemb"]) > 1:
@@ -850,6 +798,10 @@ class CodeEmitter:
 	# Print clReleaseKernel section
 	def printFreeKernels(self):
 		with open(self._targetFile, "a") as f:
+			f.write(
+				'	/* Dealloc kernels */\n'
+			)
+
 			for k in self._xmlRoot:
 				f.write(
 					(
@@ -864,6 +816,7 @@ class CodeEmitter:
 		with open(self._targetFile, "a") as f:
 			f.write(
 				(
+					'	/* Dealloc program */\n'
 					'	if(program)\n'
 					'		clReleaseProgram(program);\n'
 					'	if(programBin)\n'
@@ -877,6 +830,10 @@ class CodeEmitter:
 	# Print clReleaseCommandQueue section
 	def printFreeQueues(self):
 		with open(self._targetFile, "a") as f:
+			f.write(
+				'	/* Dealloc queues */\n'
+			)
+
 			for k in self._xmlRoot:
 				f.write(
 					(
@@ -886,18 +843,39 @@ class CodeEmitter:
 				)
 
 
-	# Print last part of code
-	def printFooter(self):
+	# Print last OpenCL deallocs
+	def printFreeFinalOpenCL(self):
 		with open(self._targetFile, "a") as f:
 			f.write(
 				(
+					'	/* Last OpenCL variables */\n'
 					'	if(context)\n'
 					'		clReleaseContext(context);\n'
 					'	if(devices)\n'
 					'		free(devices);\n'
 					'	if(platforms)\n'
 					'		free(platforms);\n'
-					'\n'
+				)
+			)
+
+
+	# Print call to postamble function
+	def printPostambleCall(self):
+		with open(self._targetFile, "a") as f:
+			if "postamble" in self._xmlRoot.attrib:
+				f.write(
+					(
+						'	/* Calling postamble function */\n'
+						'	{}({});\n'.format(self._xmlRoot.attrib["postamble"], ', '.join(self._varNameList))
+					)
+				)
+
+
+	# Print last part of code
+	def printFooter(self):
+		with open(self._targetFile, "a") as f:
+			f.write(
+				(
 					'	return rv;\n'
 					'}\n'
 				)

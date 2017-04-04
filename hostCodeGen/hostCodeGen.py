@@ -122,5 +122,13 @@ if "__main__" == __name__:
 	ce.printFreeQueues()
 	ce.printSeparator()
 
+	print("Printing last OpenCL deallocs...")
+	ce.printFreeFinalOpenCL()
+	ce.printSeparator()
+
+	print("Printing call to postamble function...")
+	ce.printPostambleCall()
+	ce.printSeparator()
+
 	print("Printing footer...")
 	ce.printFooter()

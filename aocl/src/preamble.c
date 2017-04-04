@@ -1,5 +1,5 @@
 /* ********************************************************************************************* */
-/* * Example function for input data filling                                                   * */
+/* * Example preamble function for filling some input and output data                          * */
 /* * Author: André Bannwart Perina                                                             * */
 /* ********************************************************************************************* */
 /* * Copyright (c) 2017 André B. Perina                                                        * */
@@ -22,16 +22,15 @@
 /* * DEALINGS IN THE SOFTWARE.                                                                 * */
 /* ********************************************************************************************* */
 
-/**
- * @brief This is an example function for filling input data. It is referenced on add.xml.
- * @param input Input vector to be filled of type float, according to add.xml.
- * @param size Number of elements in the input vector.
- * @param repeat Number of times the elements should be repeated on the input vector.
- */
-void fillb(float *input, int size, int repeat) {
-	int i, j;
+int prevars(float *b, unsigned int bSz, float *d, unsigned int dSz, float *dC, unsigned int dCSz) {
+	int i;
 
-	for(i = 0; i < repeat; i++)
-		for(j = 0; j < size; j++)
-			input[j + (size * i)] = j;
+	for(i = 0; i < bSz; i++)
+		b[i] = i;
+
+	for(i = 0; i < dSz; i++)
+		d[i] = 1;
+
+	for(i = 0; i < dCSz; i++)
+		dCSz[i] = 10;
 }
