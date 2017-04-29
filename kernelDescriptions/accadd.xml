@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+	This is the root kernel. The following attributes are possible:
+		program: name of generated program file (e.g. for Intel FPGA OpenCL: program.aocx);
+		preamble: (optional) if "yes", all input/output variables will be passed as argument to a macro
+			function for custom initial logic. Example:
+				PREAMBLE(a, aSz, b, bSz, c, cSz, cC, cCSz);
+				where:
+					a: pointer to input variable a;
+					aSz: number of members in array pointed by a;
+					b: pointer to input variable b;
+					bSz: number of members in array pointed by b;
+					c: pointer to output variable c;
+					cSz: number of members in array pointed by c;
+					cC: pointer to output validation variable of output c;
+					cCSz: number of members in array pointed by cC.
+			Please note that this is a macro function. All pre/postamble macro functions are expected to be implemented
+			in a header named prepostambles.h.
+		postamble: (optional) if "yes", all input/output variables will be passed as argument to a macro function
+			for custom final logic (free data, etc.). The postamble macro function header is similar to preamble's
+			(see previous example).
+		looppreamble: (optional) if "yes", all input/output variables will be passed as argument to a macro
+			function for custom initial logic inside the loop. Example: The looppreamble macro function header is similar
+			to preamble's (see previous example), except that it has an additional last argument, loopFlag. This is a
+			boolean variable used to evaluate if the loop should continue or not after the first iteration.
+		looppostamble: (optional) if "yes", all input/output variables will be passed as argument to a macro
+			function for custom final logic inside the loop. Example: The looppostamble macro function header is similar
+			to looppreamble's (see previous example).
+-->
+<kernels program="program.aocx" preamble="yes" postamble="yes" looppreamble="yes" looppostamble="yes">
+	<!--
+		This is a kernel node. One or more may be provided. The following attributes are possible:
+			name: name of kernel function;
+			order: (optional) defines the order of execution between kernels. Lower means "run before".
+				If at least one kernel node provides order attribute, all kernels must provide it.
+	-->
+	<kernel name="add" order="1">
+		<!--
+			The ndrange node provides the ndrange information for this kernel. Attributes:
+				dim: dimension of ranges. This is the work_dim variable of clEnqueueNDRangeKernel.
+		-->
+		<ndrange dim="1">
+			<!-- Global work size, must provide dim values separated by commas -->
+			<global>10</global>
+			<!-- Local work size (optional), must provide dim values separated by commas -->
+			<!--<local>5</local>-->
+		</ndrange>
+		<!--
+			Input nodes provide input data for the kernel. The content of this tag is the input
+			data itself. Attributes:
+				name: variable name;
+				type: C-compatible type of variable;
+				nmemb: number of members. If nmemb = 1, variable will be directly passed to the
+					kernel without the use of cl_mem buffers;
+				arg: argument position for kernel. This is the arg_index value of clSetKernelArg;
+		-->
+		<input name="a" type="float" nmemb="10" arg="0">9, 8, 7, 6, 5, 4, 3, 2, 1, 0</input>
+		<input name="b" type="float" nmemb="10" arg="1" />
+		<!--
+			Output nodes provide information of expected kernel's output. The content of this tag is the
+			expected output data to be validated. Attributes:
+				name: variable name;
+				type: C-compatible type of variable;
+				nmemb: number of members;
+				arg: argument position for kernel. This is the arg_index value of clSetKernelArg;
+				novalidation: (optional) if "true", validation variable ("<varname>C") will not be generated.
+		-->
+		<output name="c" type="float" nmemb="10" arg="2">27, 25, 23, 21, 19, 17, 15, 13, 11, 9</output>
+		<output name="d" type="float" nmemb="10" arg="3" />
+	</kernel>
+</kernels>
