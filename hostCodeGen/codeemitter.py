@@ -114,6 +114,78 @@ class CodeEmitter:
 					'\n'
 					'#include "common.h"\n'
 					'\n'
+				)
+			)
+
+			for k in self._xmlRoot:
+				for v in k:
+					if ("input" == v.tag) or ("output" == v.tag):
+						self._varTypeList.append("{}{}".format(v.attrib["type"], " *" if int(v.attrib["nmemb"]) > 1 else ""))
+						self._varNameList.append("{}{}".format("" if int(v.attrib["nmemb"]) > 1 else "&", v.attrib["name"]))
+						self._varTypeList.append("unsigned int")
+						self._varNameList.append(v.attrib["nmemb"])
+
+					if ("output" == v.tag) and (("novalidation" not in v.attrib) or (v.attrib["novalidation"] != "true")):
+						self._varTypeList.append("{}{}".format(v.attrib["type"], " *" if int(v.attrib["nmemb"]) > 1 else ""))
+						self._varNameList.append("{}{}C".format("" if int(v.attrib["nmemb"]) > 1 else "&", v.attrib["name"]))
+						self._varTypeList.append("unsigned int")
+						self._varNameList.append(v.attrib["nmemb"])
+
+			if ("preamble" or  "postamble" or "looppreamble" or "looppostamble") in self._xmlRoot.attrib:
+				f.write(
+					(
+						'/**\n'
+						' * @brief Header where pre/postamble macro functions should be located.\n'
+						' *        Function headers:\n'
+					)
+				)
+
+				functions = ("PREAMBLE", "POSTAMBLE", "LOOPPREAMBLE", "LOOPPOSTAMBLE")
+				usesLoopVar = (False, False, True, True)
+				for i in range(0, len(functions)):
+					f.write(
+						' *            {}('.format(functions[i])
+					)
+
+					firstExec = True
+					for v in self._varNameList[::2]:
+						if not firstExec:
+							f.write(', ')
+						else:
+							firstExec = False
+
+						f.write(
+							'{0}, {0}Sz'.format(v)
+						)
+
+					if usesLoopVar[i]:
+						f.write(', loopFlag);\n')
+					else:
+						f.write(');\n')
+
+				f.write(
+						' *        where:\n'
+				)
+
+				for i in range(0, len(self._varNameList), 2):
+					f.write(
+						(
+							' *            {0}: Variable ({1});\n'
+							' *            {0}Sz: Number of members in variable (unsigned int);\n'.format(self._varNameList[i], self._varTypeList[i])
+						)
+					)
+
+				f.write(
+					(
+						' *            loopFlag: Loop condition variable (bool).\n'
+						' */\n'
+						'#include "prepostambles.h"\n'
+						'\n'
+					)
+				)
+
+			f.write(
+				(
 					'/**\n'
 					' * @brief Standard statements for function error handling and printing.\n'
 					' *\n'
@@ -136,66 +208,12 @@ class CodeEmitter:
 					'	fprintf(stderr, "Error: %s: %s\\n", strerror(errno), arg);\\\n'
 					'}\n'
 					'\n'
-				)
-			)
-
-			for k in self._xmlRoot:
-				for v in k:
-					if "input" == v.tag and v.text is None:
-						self._varTypeList.append("{}{}".format(v.attrib["type"], " *" if int(v.attrib["nmemb"]) > 1 else ""))
-						self._varNameList.append("{}{}".format("" if int(v.attrib["nmemb"]) > 1 else "&", v.attrib["name"]))
-						self._varTypeList.append("unsigned int")
-						self._varNameList.append(v.attrib["nmemb"])
-					elif "output" == v.tag:
-						if "init" in v.attrib and "true" == v.attrib["init"]:
-							self._varTypeList.append("{}{}".format(v.attrib["type"], " *" if int(v.attrib["nmemb"]) > 1 else ""))
-							self._varNameList.append("{}{}".format("" if int(v.attrib["nmemb"]) > 1 else "&", v.attrib["name"]))
-							self._varTypeList.append("unsigned int")
-							self._varNameList.append(v.attrib["nmemb"])
-
-						if v.text is None and (("novalidation" not in v.attrib) or (v.attrib["novalidation"] != "true")):
-							self._varTypeList.append("{}{}".format(v.attrib["type"], " *" if int(v.attrib["nmemb"]) > 1 else ""))
-							self._varNameList.append("{}{}C".format("" if int(v.attrib["nmemb"]) > 1 else "&", v.attrib["name"]))
-							self._varTypeList.append("unsigned int")
-							self._varNameList.append(v.attrib["nmemb"])
-
-			if len(self._varTypeList) > 0:
-				f.write(
-					(
-						'/**\n'
-						' * @brief Functions prototypes for initialisation and/or validation data.\n'
-						' *        List of parameters:\n'
-					)
-				)
-
-				for i in range(0, len(self._varTypeList)):
-					f.write(
-						' *            {} ({})\n'.format(self._varNameList[i], self._varTypeList[i])
-					)
-
-				f.write(
-					' */\n'
-				)
-
-				if "preamble" in self._xmlRoot.attrib:
-					f.write(
-						'int {}({});\n'.format(self._xmlRoot.attrib["preamble"], ', '.join(self._varTypeList))
-					)
-				if "postamble" in self._xmlRoot.attrib:
-					f.write(
-						'void {}({});\n'.format(self._xmlRoot.attrib["postamble"], ', '.join(self._varTypeList))
-					)
-
-				f.write('\n')
-
-			f.write(
-				(
 					'int main(void) {\n'
 					'	/* Return variable */\n'
 					'	int rv = EXIT_SUCCESS;\n'
 					'\n'
 					'	/* OpenCL and aux variables */\n'
-					'	int i;\n'
+					'	int i = 0;\n'
 					'	cl_int platformsLen, devicesLen, fRet;\n'
 					'	cl_platform_id *platforms = NULL;\n'
 					'	cl_device_id *devices = NULL;\n'
@@ -240,7 +258,10 @@ class CodeEmitter:
 	def printLastDeclarations(self):
 		with open(self._targetFile, "a") as f:
 			f.write(
-				'	bool invalidDataFound = false;\n'
+				(
+					'	bool loopFlag = false;\n'
+					'	bool invalidDataFound = false;\n'
+				)
 			)
 
 			# Iterate through every kernel
@@ -375,14 +396,28 @@ class CodeEmitter:
 							'	cl_mem {}K = NULL;\n'.format(v.attrib["name"])
 						)
 
-			if "preamble" in self._xmlRoot.attrib:
+			if "preamble" in self._xmlRoot.attrib and "yes" == self._xmlRoot.attrib["preamble"]:
 				f.write(
 					'\n'
 					'	/* Calling preamble function */\n'
 					'	PRINT_STEP("Calling preamble function...");\n'
-					'	fRet = {}({});\n'
-					'	ASSERT_CALL(0 == fRet, FUNCTION_ERROR_STATEMENTS("preamble"));\n'
-					'	PRINT_SUCCESS();\n'.format(self._xmlRoot.attrib["preamble"], ', '.join(self._varNameList))
+					'	PREAMBLE('
+				)
+
+				firstExec = True
+				for v in self._varNameList:
+					if not firstExec:
+						f.write(', ')
+					else:
+						firstExec = False
+
+					f.write(v)
+
+				f.write(
+					(
+						');\n'
+						'	PRINT_SUCCESS();\n'
+					)
 				)
 
 
@@ -508,47 +543,34 @@ class CodeEmitter:
 			f.write(
 				(
 					'	/* Create input and output buffers */\n'
-					'	PRINT_STEP("Creating and setting buffers...");\n'
+					'	PRINT_STEP("Creating buffers...");\n'
 				)
 			)
 
 			for k in self._xmlRoot:
 				for v in k:
 					if "input" == v.tag:
-						if int(v.attrib["nmemb"]) > 1:
-							f.write(
-								(
-									'	{0}K = clCreateBuffer(context, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY, {1} * sizeof({2}), {0}, &fRet);\n'
-									'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateBuffer ({0}K)"));\n'.format(
-										v.attrib["name"],
-										v.attrib["nmemb"],
-										v.attrib["type"]
-									)
+						f.write(
+							(
+								'	{0}K = clCreateBuffer(context, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY, {1} * sizeof({2}), NULL, &fRet);\n'
+								'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateBuffer ({0}K)"));\n'.format(
+									v.attrib["name"],
+									v.attrib["nmemb"],
+									v.attrib["type"]
 								)
 							)
+						)
 					elif "output" == v.tag:
-						if int(v.attrib["nmemb"]) > 1:
-							f.write(
-								(
-									'	{0}K = clCreateBuffer(context, CL_MEM_COPY_HOST_PTR, {1} * sizeof({2}), {0}, &fRet);\n'
-									'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateBuffer ({0}K)"));\n'.format(
-										v.attrib["name"],
-										v.attrib["nmemb"],
-										v.attrib["type"]
-									)
+						f.write(
+							(
+								'	{0}K = clCreateBuffer(context, CL_MEM_COPY_HOST_PTR, {1} * sizeof({2}), NULL, &fRet);\n'
+								'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateBuffer ({0}K)"));\n'.format(
+									v.attrib["name"],
+									v.attrib["nmemb"],
+									v.attrib["type"]
 								)
 							)
-						else:
-							f.write(
-								(
-									'	{0}K = clCreateBuffer(context, CL_MEM_COPY_HOST_PTR, {1} * sizeof({2}), &{0}, &fRet);\n'
-									'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateBuffer ({0}K)"));\n'.format(
-										v.attrib["name"],
-										v.attrib["nmemb"],
-										v.attrib["type"]
-									)
-								)
-							)
+						)
 
 			f.write(
 				'	PRINT_SUCCESS();\n'
@@ -587,6 +609,83 @@ class CodeEmitter:
 				)
 
 
+	# Print loop header and first calls
+	def printLoopHeader(self):
+		with open(self._targetFile, "a") as f:
+			f.write('	do {\n')
+
+			if "looppreamble" in self._xmlRoot.attrib and "yes" == self._xmlRoot.attrib["looppreamble"]:
+				f.write(
+					'		/* Calling loop preamble function */\n'
+					'		PRINT_STEP("[%d] Calling loop preamble function...", i);\n'
+					'		LOOPPREAMBLE('
+				)
+
+				for v in self._varNameList:
+					f.write(
+						'{}, '.format(v)
+					)
+
+				f.write(
+					(
+						'loopFlag);\n'
+						'		PRINT_SUCCESS();\n'
+						'\n'.format(v)
+					)
+				)
+
+			f.write(
+				(
+					'		/* Setting input and output buffers */\n'
+					'		PRINT_STEP("[%d] Setting buffers...", i);\n'
+				)
+			)
+
+			for k in self._xmlRoot:
+				for v in k:
+					if "input" == v.tag:
+						if int(v.attrib["nmemb"]) > 1:
+							f.write(
+								(
+									'		fRet = clEnqueueWriteBuffer(queue{0}, {1}K, CL_TRUE, 0, {2} * sizeof({3}), {1}, 0, NULL, NULL);\n'
+									'		ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clEnqueueWriteBuffer ({1}K)"));\n'.format(
+										k.attrib["name"].title(),
+										v.attrib["name"],
+										v.attrib["nmemb"],
+										v.attrib["type"]
+									)
+								)
+							)
+					elif "output" == v.tag:
+						if int(v.attrib["nmemb"]) > 1:
+							f.write(
+								(
+									'		fRet = clEnqueueWriteBuffer(queue{0}, {1}K, CL_TRUE, 0, {2} * sizeof({3}), {1}, 0, NULL, NULL);\n'
+									'		ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clEnqueueWriteBuffer ({1}K)"));\n'.format(
+										k.attrib["name"].title(),
+										v.attrib["name"],
+										v.attrib["nmemb"],
+										v.attrib["type"]
+									)
+								)
+							)
+						else:
+							f.write(
+								(
+									'		fRet = clEnqueueWriteBuffer(queue{0}, {1}K, CL_TRUE, 0, sizeof({2}), &{1}, 0, NULL, NULL);\n'
+									'		ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clEnqueueWriteBuffer ({1}K)"));\n'.format(
+										k.attrib["name"].title(),
+										v.attrib["name"],
+										v.attrib["type"]
+									)
+								)
+							)
+
+			f.write(
+				'		PRINT_SUCCESS();\n'
+			)
+
+
 	# Print clEnqueueNDRangeKernel for all kernels
 	def printEnqueueKernel(self):
 		with open(self._targetFile, "a") as f:
@@ -621,8 +720,8 @@ class CodeEmitter:
 				# Declare event blockers
 				f.write(
 					(
-						'	cl_event blockers[{}];\n'
-						'	PRINT_STEP("Running kernels...");\n'.format(len(orderedIndexes) - 1)
+						'		cl_event blockers[{}];\n'
+						'		PRINT_STEP("[%d] Running kernels...", i);\n'.format(len(orderedIndexes) - 1)
 					)
 				)
 
@@ -640,8 +739,8 @@ class CodeEmitter:
 
 						f.write(
 							(
-								'	fRet = clEnqueueNDRangeKernel(queue{0}, kernel{0}, workDim{0}, NULL, globalSize{0}, {1}, {2}, {3}, {4});\n'
-								'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clEnqueueNDRangeKernel"));\n'.format(
+								'		fRet = clEnqueueNDRangeKernel(queue{0}, kernel{0}, workDim{0}, NULL, globalSize{0}, {1}, {2}, {3}, {4});\n'
+								'		ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clEnqueueNDRangeKernel"));\n'.format(
 									k.attrib["name"].title(),
 									localSize,
 									"0" if 0 == i else "1",
@@ -652,12 +751,12 @@ class CodeEmitter:
 						)
 
 				f.write(
-					'	PRINT_SUCCESS();\n'
+					'		PRINT_SUCCESS();\n'
 				)
 			# Kernels has no ordering
 			else:
 				f.write(
-					'	PRINT_STEP("Running kernels...");\n'
+					'		PRINT_STEP("[%d] Running kernels...", i);\n'
 				)
 
 				for k in self._xmlRoot:
@@ -671,8 +770,8 @@ class CodeEmitter:
 
 					f.write(
 						(
-							'	fRet = clEnqueueNDRangeKernel(queue{0}, kernel{0}, workDim{0}, NULL, globalSize{0}, {1}, 0, NULL, NULL);\n'
-							'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clEnqueueNDRangeKernel"));\n'.format(
+							'		fRet = clEnqueueNDRangeKernel(queue{0}, kernel{0}, workDim{0}, NULL, globalSize{0}, {1}, 0, NULL, NULL);\n'
+							'		ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clEnqueueNDRangeKernel"));\n'.format(
 								k.attrib["name"].title(),
 								localSize
 							)
@@ -680,7 +779,7 @@ class CodeEmitter:
 					)
 
 				f.write(
-					'	PRINT_SUCCESS();\n'
+					'		PRINT_SUCCESS();\n'
 				)
 
 
@@ -689,8 +788,8 @@ class CodeEmitter:
 		with open(self._targetFile, "a") as f:
 			f.write(
 				(
-					'	/* Get output buffers */\n'
-					'	PRINT_STEP("Getting kernels arguments...");\n'
+					'		/* Get output buffers */\n'
+					'		PRINT_STEP("[%d] Getting kernels arguments...", i);\n'
 				)
 			)
 
@@ -698,7 +797,7 @@ class CodeEmitter:
 				for v in k:
 					if "output" == v.tag:
 						f.write(
-							'	fRet = clEnqueueReadBuffer(queue{0}, {1}K, CL_TRUE, 0, {2} * sizeof({3}), {4}{1}, 0, NULL, NULL);\n'.format(
+							'		fRet = clEnqueueReadBuffer(queue{0}, {1}K, CL_TRUE, 0, {2} * sizeof({3}), {4}{1}, 0, NULL, NULL);\n'.format(
 								k.attrib["name"].title(),
 								v.attrib["name"],
 								v.attrib["nmemb"],
@@ -709,10 +808,64 @@ class CodeEmitter:
 
 			f.write(
 				(
-					'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clEnqueueReadBuffer"));\n'
-					'	PRINT_SUCCESS();\n'
+					'		ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clEnqueueReadBuffer"));\n'
+					'		PRINT_SUCCESS();\n'
 				)
 			)
+
+	# Print footer of loop
+	def printLoopFooter(self):
+		with open(self._targetFile, "a") as f:
+			if "looppostamble" in self._xmlRoot.attrib and "yes" == self._xmlRoot.attrib["looppostamble"]:
+				f.write(
+					'		/* Calling loop postamble function */\n'
+					'		PRINT_STEP("[%d] Calling loop postamble function...", i);\n'
+					'		LOOPPOSTAMBLE('
+				)
+
+				for v in self._varNameList:
+					f.write(
+						'{}, '.format(v)
+					)
+
+				f.write(
+					(
+						'loopFlag);\n'
+						'		PRINT_SUCCESS();\n'
+					)
+				)
+
+			f.write(
+				'	} while(loopFlag);\n'
+			)
+
+
+	# TODO: Put here or with deallocs?
+	# Print postamble
+	def printPostamble(self):
+		with open(self._targetFile, "a") as f:
+			if "postamble" in self._xmlRoot.attrib and "yes" == self._xmlRoot.attrib["postamble"]:
+				f.write(
+					'	/* Calling postamble function */\n'
+					'	PRINT_STEP("Calling postamble function...");\n'
+					'	POSTAMBLE('
+				)
+
+				firstExec = True
+				for v in self._varNameList:
+					if not firstExec:
+						f.write(', ')
+					else:
+						firstExec = False
+
+					f.write(v)
+
+				f.write(
+					(
+						');\n'
+						'	PRINT_SUCCESS();\n'
+					)
+				)
 
 
 	# Print code for output validation
@@ -861,15 +1014,15 @@ class CodeEmitter:
 
 
 	# Print call to postamble function
-	def printPostambleCall(self):
-		with open(self._targetFile, "a") as f:
-			if "postamble" in self._xmlRoot.attrib:
-				f.write(
-					(
-						'	/* Calling postamble function */\n'
-						'	{}({});\n'.format(self._xmlRoot.attrib["postamble"], ', '.join(self._varNameList))
-					)
-				)
+#	def printPostambleCall(self):
+#		with open(self._targetFile, "a") as f:
+#			if "postamble" in self._xmlRoot.attrib:
+#				f.write(
+#					(
+#						'	/* Calling postamble function */\n'
+#						'	{}({});\n'.format(self._xmlRoot.attrib["postamble"], ', '.join(self._varNameList))
+#					)
+#				)
 
 
 	# Print last part of code

@@ -31,7 +31,7 @@ from codeemitter import CodeEmitter
 
 if "__main__" == __name__:
 	if len(sys.argv) != 3:
-		sys.stderr.write("Usage: hostCodeGen KERNELSXML TARGETFILE KERNELSXML\n");
+		sys.stderr.write("Usage: hostCodeGen KERNELSXML TARGETFILE\n");
 		sys.stderr.write("\tKERNELSXML\tXML with descriptions of kernels\n");
 		sys.stderr.write("\tTARGETFILE\tOutput source code filename\n");
 		exit(1)
@@ -90,12 +90,24 @@ if "__main__" == __name__:
 	ce.printSetKernelsArgs()
 	ce.printSeparator()
 
+	print("Printing loop header...")
+	ce.printLoopHeader()
+	ce.printSeparator()
+
 	print("Printing enqueueKernel sections...")
 	ce.printEnqueueKernel()
 	ce.printSeparator()
 
 	print("Printing enqueueReadBuffer sections...")
 	ce.printEnqueueReadBuffer()
+	ce.printSeparator()
+
+	print("Printing loop footer...")
+	ce.printLoopFooter()
+	ce.printSeparator()
+
+	print("Printing postamble...")
+	ce.printPostamble()
 	ce.printSeparator()
 
 	print("Printing validation sections...")
@@ -126,9 +138,9 @@ if "__main__" == __name__:
 	ce.printFreeFinalOpenCL()
 	ce.printSeparator()
 
-	print("Printing call to postamble function...")
-	ce.printPostambleCall()
-	ce.printSeparator()
+#	print("Printing call to postamble function...")
+#	ce.printPostambleCall()
+#	ce.printSeparator()
 
 	print("Printing footer...")
 	ce.printFooter()
