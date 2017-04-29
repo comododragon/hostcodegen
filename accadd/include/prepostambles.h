@@ -22,10 +22,13 @@
 /* * DEALINGS IN THE SOFTWARE.                                                                 * */
 /* ********************************************************************************************* */
 
+int _counter;
+
 #define PREAMBLE(a, aSz, b, bSz, c, cSz, cC, cCSz, d, dSz, dC, dCSz) {\
 	int _i;\
-	int _counter = 0;\
-	float _example = {57, 54, 51, 48, 45, 42, 39, 36, 33, 30};\
+	float _example[10] = {57, 54, 51, 48, 45, 42, 39, 36, 33, 30};\
+\
+	_counter = 0;\
 \
 	for(_i = 0; _i < bSz; _i++)\
 		b[_i] = _i;\
@@ -36,12 +39,14 @@
 }
 
 #define LOOPPREAMBLE(a, aSz, b, bSz, c, cSz, cC, cCSz, d, dSz, dC, dCSz, loopFlag) {\
-	for(_i = 0; __i < dSz; _i++)\
+	int _i;\
+	for(_i = 0; _i < dSz; _i++)\
 		d[_i]++;\
 }
 
 #define LOOPPOSTAMBLE(a, aSz, b, bSz, c, cSz, cC, cCSz, d, dSz, dC, dCSz, loopFlag) {\
-	for(_i = 0; __i < bSz; _i++)\
+	int _i;\
+	for(_i = 0; _i < bSz; _i++)\
 		b[_i] = c[_i];\
 \
 	_counter++;\

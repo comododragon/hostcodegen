@@ -1,68 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-	This is the root kernel. The following attributes are possible:
-		program: name of generated program file (e.g. for Intel FPGA OpenCL: program.aocx);
-		preamble: (optional) if specified, all input/output data without explicit initialisation or output data
-			without explicit validation variables will be passed as argument for custom initial logic.
-			Suppose if inputs a and b must be initialised and output c (ints) must have its validation initialised
-			and the "preamble" attribute is "foobar". The function would be:
-				int foobar(int *a, unsigned int aSz, int *b, unsigned int bSz, int *cC, unsigned int cCSz);
-				where:
-					return value: 0 for success, else for failure;
-					a: pointer to input variable a;
-					aSz: number of members in array pointed by a;
-					b: pointer to input variable b;
-					bSz: number of members in array pointed by b;
-					cC: pointer to output validation variable of output c;
-					cCSz: number of members in array pointed by cC.
-		postamble: (optional) if specified, all input/output data without explicit initialisation or output data
-			without explicit validation variables will be passed as argument for custom final logic (free data, etc.).
-			The postamble function header is similar to preamble's (see previous example), except for return value,
-			which is void.
--->
-<kernels program="program.aocx" repeat="5" preamble="prevars">
-	<!--
-		This is a kernel node. One or more may be provided. The following attributes are possible:
-			name: name of kernel function;
-			order: (optional) defines the order of execution between kernels. Lower means "run before".
-				If at least one kernel node provides order attribute, all kernels must provide it.
-	-->
+<kernels program="program.aocx" preamble="yes">
 	<kernel name="add" order="1">
-		<!--
-			The ndrange node provides the ndrange information for this kernel. Attributes:
-				dim: dimension of ranges. This is the work_dim variable of clEnqueueNDRangeKernel.
-		-->
 		<ndrange dim="1">
-			<!-- Global work size, must provide dim values separated by commas -->
 			<global>10</global>
-			<!-- Local work size (optional), must provide dim values separated by commas -->
-			<!--<local>5</local>-->
 		</ndrange>
-		<!--
-			Input nodes provide input data for the kernel. The content of this tag is the input
-			data itself. If no content is provided, this variable will be passed as parameter
-			to preamble/postamble functions defined in the root tag. Attributes:
-				name: variable name;
-				type: C-compatible type of variable;
-				nmemb: number of members. If nmemb = 1, variable will be directly passed to the
-					kernel without the use of cl_mem buffers;
-				arg: argument position for kernel. This is the arg_index value of clSetKernelArg;
-		-->
 		<input name="a" type="float" nmemb="10" arg="0">9, 8, 7, 6, 5, 4, 3, 2, 1, 0</input>
 		<input name="b" type="float" nmemb="10" arg="1" />
-		<!--
-			Output nodes provide information of expected kernel's output. The content of this tag is the
-			expected output data to be validated. If no content is provided, the expected output data should
-			be initialised inside the preamble/postamble functions on a variable named "<varName>C". Attributes:
-				name: variable name;
-				type: C-compatible type of variable;
-				nmemb: number of members;
-				arg: argument position for kernel. This is the arg_index value of clSetKernelArg;
-				init: (optional) if "true", this variable will be passed as argument to preamble/postamble
-					functions for initialisation;
-				novalidation: (optional) if "true", validation variable ("<varname>C") will not be generated.
-		-->
 		<output name="c" type="float" nmemb="10" arg="2">9, 9, 9, 9, 9, 9, 9, 9, 9, 9</output>
-		<output name="d" type="float" nmemb="10" arg="3" init="true" />
+		<output name="d" type="float" nmemb="10" arg="3" />
 	</kernel>
 </kernels>

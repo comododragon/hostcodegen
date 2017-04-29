@@ -552,7 +552,7 @@ class CodeEmitter:
 					if "input" == v.tag:
 						f.write(
 							(
-								'	{0}K = clCreateBuffer(context, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY, {1} * sizeof({2}), NULL, &fRet);\n'
+								'	{0}K = clCreateBuffer(context, CL_MEM_READ_ONLY, {1} * sizeof({2}), NULL, &fRet);\n'
 								'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateBuffer ({0}K)"));\n'.format(
 									v.attrib["name"],
 									v.attrib["nmemb"],
@@ -563,7 +563,7 @@ class CodeEmitter:
 					elif "output" == v.tag:
 						f.write(
 							(
-								'	{0}K = clCreateBuffer(context, CL_MEM_COPY_HOST_PTR, {1} * sizeof({2}), NULL, &fRet);\n'
+								'	{0}K = clCreateBuffer(context, CL_MEM_READ_WRITE, {1} * sizeof({2}), NULL, &fRet);\n'
 								'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateBuffer ({0}K)"));\n'.format(
 									v.attrib["name"],
 									v.attrib["nmemb"],
@@ -836,6 +836,7 @@ class CodeEmitter:
 				)
 
 			f.write(
+				'		i++;\n'
 				'	} while(loopFlag);\n'
 			)
 
