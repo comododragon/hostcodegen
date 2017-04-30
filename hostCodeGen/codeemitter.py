@@ -121,13 +121,13 @@ class CodeEmitter:
 				for v in k:
 					if ("input" == v.tag) or ("output" == v.tag):
 						self._varTypeList.append("{}{}".format(v.attrib["type"], " *" if int(v.attrib["nmemb"]) > 1 else ""))
-						self._varNameList.append("{}{}".format("" if int(v.attrib["nmemb"]) > 1 else "&", v.attrib["name"]))
+						self._varNameList.append(v.attrib["name"])
 						self._varTypeList.append("unsigned int")
 						self._varNameList.append(v.attrib["nmemb"])
 
 					if ("output" == v.tag) and (("novalidation" not in v.attrib) or (v.attrib["novalidation"] != "true")):
 						self._varTypeList.append("{}{}".format(v.attrib["type"], " *" if int(v.attrib["nmemb"]) > 1 else ""))
-						self._varNameList.append("{}{}C".format("" if int(v.attrib["nmemb"]) > 1 else "&", v.attrib["name"]))
+						self._varNameList.append("{}C".format(v.attrib["name"]))
 						self._varTypeList.append("unsigned int")
 						self._varNameList.append(v.attrib["nmemb"])
 
