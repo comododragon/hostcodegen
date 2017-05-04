@@ -22,6 +22,10 @@
 # # DEALINGS IN THE SOFTWARE.                                                                 #
 # #############################################################################################
 
+ifeq ($(OP),)
+    OP=add
+endif
+
 GENERALFLAGS=-fPIC -DCOMMON_COLOURED_PRINTS -Iinclude/common -Iinclude/$(OP)
 AOCLFLAGS=`aocl compile-config` `aocl link-config`
 
