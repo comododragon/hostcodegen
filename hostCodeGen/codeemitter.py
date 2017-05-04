@@ -32,8 +32,11 @@ from xml.etree import ElementTree
 class CodeEmitter:
 	_targetFile = ""
 	_xmlRoot = ()
+	# Type of arguments used in the PRE/POSTAMBLE functions
 	_varTypeList = []
+	# Name of arguments used in the PRE/POSTAMBLE functions
 	_varNameList = []
+	# Mappers between C types and their printf format flags
 	_printfMapper = {
 		"char": "c",
 		"signed char": "c",
@@ -76,7 +79,7 @@ class CodeEmitter:
 			pass
 
 
-	# Print header: includes, macros, function prototypes and first declarations of main()
+	# Print header: includes, macros and first declarations of main()
 	def printHeader(self):
 		with open(self._targetFile, "a") as f:
 			f.write(
@@ -117,6 +120,7 @@ class CodeEmitter:
 				)
 			)
 
+			# Populate lists of arguments for PRE/POSTAMBLE functions
 			for k in self._xmlRoot:
 				for v in k:
 					if ("input" == v.tag) or ("output" == v.tag):
@@ -131,6 +135,7 @@ class CodeEmitter:
 						self._varTypeList.append("unsigned int")
 						self._varNameList.append(v.attrib["nmemb"])
 
+			# If any PRE/POSTAMBLE function was enabled, include the respective header
 			if ("preamble" or  "postamble" or "looppreamble" or "looppostamble") in self._xmlRoot.attrib:
 				f.write(
 					(
@@ -170,14 +175,14 @@ class CodeEmitter:
 				for i in range(0, len(self._varNameList), 2):
 					f.write(
 						(
-							' *            {0}: Variable ({1});\n'
-							' *            {0}Sz: Number of members in variable (unsigned int);\n'.format(self._varNameList[i], self._varTypeList[i])
+							' *            {0}: variable ({1});\n'
+							' *            {0}Sz: number of members in variable (unsigned int);\n'.format(self._varNameList[i], self._varTypeList[i])
 						)
 					)
 
 				f.write(
 					(
-						' *            loopFlag: Loop condition variable (bool).\n'
+						' *            loopFlag: loop condition variable (bool).\n'
 						' */\n'
 						'#include "prepostambles.h"\n'
 						'\n'
@@ -320,7 +325,7 @@ class CodeEmitter:
 			for k in self._xmlRoot:
 				for v in k:
 					if "input" == v.tag:
-						# Part 1: Host variable
+						# Part 1: host variable
 						# Function is being used instead of explicit variable initialisation
 						if v.text is None:
 							if int(v.attrib["nmemb"]) > 1:
@@ -346,15 +351,14 @@ class CodeEmitter:
 									'	{} {} = {};\n'.format(v.attrib["type"], v.attrib["name"], v.text)
 								)
 
-						# Part 2: Device variable
+						# Part 2: device variable
 						if int(v.attrib["nmemb"]) > 1:
 							f.write(
 								'	cl_mem {}K = NULL;\n'.format(v.attrib["name"])
 							)
 					elif "output" == v.tag:
-						# Part 1: Host variable
-						# For output, initialisation data must come from initfunction. If initfunction is not supplied, no
-						# initialisation is done
+						# Part 1: host variable
+						# For output, initialisation data must come from PREAMBLE.
 						if int(v.attrib["nmemb"]) > 1:
 							f.write(
 								'	{} {}[{}];\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"])
@@ -364,7 +368,7 @@ class CodeEmitter:
 								'	{} {};\n'.format(v.attrib["type"], v.attrib["name"])
 							)
 
-						# Part 2: Validation variable
+						# Part 2: validation variable
 						if ("novalidation" not in v.attrib) or (v.attrib["novalidation"] != "true"):
 							# Function is being used instead of explicit validation variable assignment
 							if v.text is None:
@@ -391,11 +395,12 @@ class CodeEmitter:
 										'	{} {}C = {};\n'.format(v.attrib["type"], v.attrib["name"], v.text)
 									)
 
-						# Part 3: Device variable
+						# Part 3: device variable
 						f.write(
 							'	cl_mem {}K = NULL;\n'.format(v.attrib["name"])
 						)
 
+			# Call PREAMBLE function if "preamble" attribute is "yes"
 			if "preamble" in self._xmlRoot.attrib and "yes" == self._xmlRoot.attrib["preamble"]:
 				f.write(
 					'\n'
@@ -404,6 +409,7 @@ class CodeEmitter:
 					'	PREAMBLE('
 				)
 
+				# Print arguments
 				firstExec = True
 				for v in self._varNameList:
 					if not firstExec:
@@ -589,11 +595,14 @@ class CodeEmitter:
 				)
 
 				for v in k:
+					# If it is an input variable and its size is 1, send the variable explicitely
 					if "input" == v.tag and 1 == int(v.attrib["nmemb"]):
 						f.write(
 							(
 								'	fRet = clSetKernelArg(kernel{0}, {1}, sizeof({2}), &{3});\n'
-								'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clSetKernelArg ({3})"));\n'.format(k.attrib["name"].title(), v.attrib["arg"], v.attrib["type"], v.attrib["name"])
+								'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clSetKernelArg ({3})"));\n'.format(
+									k.attrib["name"].title(), v.attrib["arg"], v.attrib["type"], v.attrib["name"]
+								)
 							)
 						)
 					elif "input" == v.tag or "output" == v.tag:
@@ -614,6 +623,7 @@ class CodeEmitter:
 		with open(self._targetFile, "a") as f:
 			f.write('	do {\n')
 
+			# Call LOOPPREAMBLE if set
 			if "looppreamble" in self._xmlRoot.attrib and "yes" == self._xmlRoot.attrib["looppreamble"]:
 				f.write(
 					'		/* Calling loop preamble function */\n'
@@ -641,8 +651,10 @@ class CodeEmitter:
 				)
 			)
 
+			# For each kernel, set the input/output data
 			for k in self._xmlRoot:
 				for v in k:
+					# clEnqueueWriteBuffer for arrays, clSetKernelArg for single input
 					if "input" == v.tag:
 						if int(v.attrib["nmemb"]) > 1:
 							f.write(
@@ -653,6 +665,15 @@ class CodeEmitter:
 										v.attrib["name"],
 										v.attrib["nmemb"],
 										v.attrib["type"]
+									)
+								)
+							)
+						else:
+							f.write(
+								(
+									'		fRet = clSetKernelArg(kernel{0}, {1}, sizeof({2}), &{3});\n'
+									'		ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clSetKernelArg ({3})"));\n'.format(
+										k.attrib["name"].title(), v.attrib["arg"], v.attrib["type"], v.attrib["name"]
 									)
 								)
 							)
@@ -816,6 +837,7 @@ class CodeEmitter:
 	# Print footer of loop
 	def printLoopFooter(self):
 		with open(self._targetFile, "a") as f:
+			# Call LOOPPOSTAMBLE
 			if "looppostamble" in self._xmlRoot.attrib and "yes" == self._xmlRoot.attrib["looppostamble"]:
 				f.write(
 					'		/* Calling loop postamble function */\n'
@@ -891,7 +913,7 @@ class CodeEmitter:
 									'				PRINT_FAIL();\n'
 									'				invalidDataFound = true;\n'
 									'			}}\n'
-									'			printf("Variable {1}[%d]: Expected %{2} got %{2}.\\n", i, {1}C[i], {1}[i]);\n'
+									'			printf("Variable {1}[%d]: expected %{2} got %{2}.\\n", i, {1}C[i], {1}[i]);\n'
 									'		}}\n'
 									'	}}\n'.format(
 										v.attrib["nmemb"],
@@ -908,7 +930,7 @@ class CodeEmitter:
 									'			PRINT_FAIL();\n'
 									'			invalidDataFound = true;\n'
 									'		}}\n'
-									'		printf("Variable {0}: Expected %{1} got %{1}.\\n", i, {0}C, {0});\n'
+									'		printf("Variable {0}: expected %{1} got %{1}.\\n", i, {0}C, {0});\n'
 									'	}}\n'.format(
 										v.attrib["name"],
 										self._printfMapper[v.attrib["type"]] if v.attrib["type"] in self._printfMapper else "x"
@@ -1012,18 +1034,6 @@ class CodeEmitter:
 					'		free(platforms);\n'
 				)
 			)
-
-
-	# Print call to postamble function
-#	def printPostambleCall(self):
-#		with open(self._targetFile, "a") as f:
-#			if "postamble" in self._xmlRoot.attrib:
-#				f.write(
-#					(
-#						'	/* Calling postamble function */\n'
-#						'	{}({});\n'.format(self._xmlRoot.attrib["postamble"], ', '.join(self._varNameList))
-#					)
-#				)
 
 
 	# Print last part of code

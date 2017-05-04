@@ -1,5 +1,5 @@
 [submodule "add/include/common"]
-	path = add/include/common
+	path = aocl/include/common
 	url = https://github.com/comododragon/commonh
 
 [submodule "accadd/include/common"]
