@@ -555,7 +555,7 @@ class CodeEmitter:
 
 			for k in self._xmlRoot:
 				for v in k:
-					if "input" == v.tag:
+					if "input" == v.tag and int(v.attrib["nmemb"]) > 1:
 						f.write(
 							(
 								'	{0}K = clCreateBuffer(context, CL_MEM_READ_ONLY, {1} * sizeof({2}), NULL, &fRet);\n'
