@@ -22,7 +22,14 @@
 # # DEALINGS IN THE SOFTWARE.                                                                 #
 # #############################################################################################
 
-ifeq ($(OP),)
+ifeq ($(OP),add)
+    CLFILE=src/device.cl
+else ifeq ($(OP),accadd)
+    CLFILE=src/device.cl
+else ifeq ($(OP),vadd)
+    CLFILE=src/device2.cl
+else
+    CLFILE=src/device.cl
     OP=add
 endif
 
@@ -33,17 +40,17 @@ emu/emulate: include/common/common.h include/$(OP)/prepostambles.h src/host.c em
 	mkdir -p emu
 	$(CC) src/host.c -o emu/emulate $(GENERALFLAGS) $(AOCLFLAGS)
 
-emu/program.aocx: src/device.cl
+emu/program.aocx: $(CLFILE)
 	mkdir -p emu
-	aoc -v -march=emulator -g --board s5phq_a7 src/device.cl -o emu/program.aocx
+	aoc -v -march=emulator -g --board s5phq_a7 $(CLFILE) -o emu/program.aocx
 
 bin/execute: include/common/common.h include/$(OP)/prepostambles.h src/host.c bin/program.aocx
 	mkdir -p bin
 	$(CC) src/host.c -o bin/execute $(GENERALFLAGS) $(AOCLFLAGS)
 
-bin/program.aocx: src/device.cl
+bin/program.aocx: $(CLFILE)
 	mkdir -p bin
-	aoc -v --board s5phq_a7 src/device.cl -o bin/program.aocx
+	aoc -v --board s5phq_a7 $(CLFILE) -o bin/program.aocx
 
 clean:
-	rm -r bin emu
+	rm -rf bin emu emu_program

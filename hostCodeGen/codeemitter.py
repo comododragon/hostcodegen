@@ -68,6 +68,64 @@ class CodeEmitter:
 		"double": "lf",
 		"long double": "Lf"
 	}
+	# Array of vector types
+	_vectorTypes = {
+		"cl_char2": (2, "char"),
+		"cl_uchar2": (2, "unsigned char"),
+		"cl_short2": (2, "short"),
+		"cl_ushort2": (2, "unsigned short"),
+		"cl_int2": (2, "int"),
+		"cl_uint2": (2, "unsigned int"),
+		"cl_long2": (2, "long"),
+		"cl_ulong2": (2, "unsigned long"),
+		"cl_half2": (2, "float"),
+		"cl_float2": (2, "float"),
+		"cl_double2": (2, "double"),
+		"cl_char3": (3, "char"),
+		"cl_uchar3": (3, "unsigned char"),
+		"cl_short3": (3, "short"),
+		"cl_ushort3": (3, "unsigned short"),
+		"cl_int3": (3, "int"),
+		"cl_uint3": (3, "unsigned int"),
+		"cl_long3": (3, "long"),
+		"cl_ulong3": (3, "unsigned long"),
+		"cl_half3": (3, "float"),
+		"cl_float3": (3, "float"),
+		"cl_double3": (3, "double"),
+		"cl_char4": (4, "char"),
+		"cl_uchar4": (4, "unsigned char"),
+		"cl_short4": (4, "short"),
+		"cl_ushort4": (4, "unsigned short"),
+		"cl_int4": (4, "int"),
+		"cl_uint4": (4, "unsigned int"),
+		"cl_long4": (4, "long"),
+		"cl_ulong4": (4, "unsigned long"),
+		"cl_half4": (4, "float"),
+		"cl_float4": (4, "float"),
+		"cl_double4": (4, "double"),
+		"cl_char8": (8, "char"),
+		"cl_uchar8": (8, "unsigned char"),
+		"cl_short8": (8, "short"),
+		"cl_ushort8": (8, "unsigned short"),
+		"cl_int8": (8, "int"),
+		"cl_uint8": (8, "unsigned int"),
+		"cl_long8": (8, "long"),
+		"cl_ulong8": (8, "unsigned long"),
+		"cl_half8": (8, "float"),
+		"cl_float8": (8, "float"),
+		"cl_double8": (8, "double"),
+		"cl_char16": (16, "char"),
+		"cl_uchar16": (16, "unsigned char"),
+		"cl_short16": (16, "short"),
+		"cl_ushort16": (16, "unsigned short"),
+		"cl_int16": (16, "int"),
+		"cl_uint16": (16, "unsigned int"),
+		"cl_long16": (16, "long"),
+		"cl_ulong16": (16, "unsigned long"),
+		"cl_half16": (16, "float"),
+		"cl_float16": (16, "float"),
+		"cl_double16": (16, "double")
+	}
 
 
 	def __init__(self, xmlFile, targetFile):
@@ -218,7 +276,7 @@ class CodeEmitter:
 					'	int rv = EXIT_SUCCESS;\n'
 					'\n'
 					'	/* OpenCL and aux variables */\n'
-					'	int i = 0;\n'
+					'	int i = 0, j = 0;\n'
 					'	cl_int platformsLen, devicesLen, fRet;\n'
 					'	cl_platform_id *platforms = NULL;\n'
 					'	cl_device_id *devices = NULL;\n'
@@ -904,39 +962,83 @@ class CodeEmitter:
 			for k in self._xmlRoot:
 				for v in k:
 					if ("output" == v.tag) and (("novalidation" not in v.attrib) or (v.attrib["novalidation"] != "true")):
-						if int(v.attrib["nmemb"]) > 1:
-							f.write(
-								(
-									'	for(i = 0; i < {0}; i++) {{\n'
-									'		if({1}C[i] != {1}[i]) {{\n'
-									'			if(!invalidDataFound) {{\n'
-									'				PRINT_FAIL();\n'
-									'				invalidDataFound = true;\n'
-									'			}}\n'
-									'			printf("Variable {1}[%d]: expected %{2} got %{2}.\\n", i, {1}C[i], {1}[i]);\n'
-									'		}}\n'
-									'	}}\n'.format(
-										v.attrib["nmemb"],
-										v.attrib["name"],
-										self._printfMapper[v.attrib["type"]] if v.attrib["type"] in self._printfMapper else "x"
+						# Variable is of vector type (e.g. cl_double2)
+						if v.attrib["type"] in self._vectorTypes:
+							vectorType = self._vectorTypes[v.attrib["type"]]
+							if int(v.attrib["nmemb"]) > 1:
+								f.write(
+									(
+										'	for(i = 0; i < {0}; i++) {{\n'
+										'		for(j = 0; j < {1}; j++) {{\n'
+										'			if({2}C[i].s[j] != {2}[i].s[j]) {{\n'
+										'				if(!invalidDataFound) {{\n'
+										'					PRINT_FAIL();\n'
+										'					invalidDataFound = true;\n'
+										'				}}\n'
+										'				printf("Variable {2}[%d].s[%d]: expected %{3} got %{3}.\\n", i, j, {2}C[i].s[j], {2}[i].s[j]);\n'
+										'			}}\n'
+										'		}}\n'
+										'	}}\n'.format(
+											v.attrib["nmemb"],
+											vectorType[0],
+											v.attrib["name"],
+											self._printfMapper[vectorType[1]] if vectorType[1] in self._printfMapper else "x"
+										)
 									)
 								)
-							)
+							else:
+								f.write(
+									(
+										'	for(i = 0; i < {0}; i++) {{\n'
+										'		if({1}C.s[i] != {1}.s[i]) {{\n'
+										'			if(!invalidDataFound) {{\n'
+										'				PRINT_FAIL();\n'
+										'				invalidDataFound = true;\n'
+										'			}}\n'
+										'			printf("Variable {1}.s[%d]: expected %{2} got %{2}.\\n", i, {1}C.s[j], {1}.s[j]);\n'
+										'		}}\n'
+										'	}}\n'.format(
+											vectorType[0],
+											v.attrib["name"],
+											self._printfMapper[vectorType[1]] if vectorType[1] in self._printfMapper else "x"
+										)
+									)
+								)
+						# Not vector type variable
 						else:
-							f.write(
-								(
-									'	if({0}C != {0}) {{\n'
-									'		if(!invalidDataFound) {{\n'
-									'			PRINT_FAIL();\n'
-									'			invalidDataFound = true;\n'
-									'		}}\n'
-									'		printf("Variable {0}: expected %{1} got %{1}.\\n", i, {0}C, {0});\n'
-									'	}}\n'.format(
-										v.attrib["name"],
-										self._printfMapper[v.attrib["type"]] if v.attrib["type"] in self._printfMapper else "x"
+							if int(v.attrib["nmemb"]) > 1:
+								f.write(
+									(
+										'	for(i = 0; i < {0}; i++) {{\n'
+										'		if({1}C[i] != {1}[i]) {{\n'
+										'			if(!invalidDataFound) {{\n'
+										'				PRINT_FAIL();\n'
+										'				invalidDataFound = true;\n'
+										'			}}\n'
+										'			printf("Variable {1}[%d]: expected %{2} got %{2}.\\n", i, {1}C[i], {1}[i]);\n'
+										'		}}\n'
+										'	}}\n'.format(
+											v.attrib["nmemb"],
+											v.attrib["name"],
+											self._printfMapper[v.attrib["type"]] if v.attrib["type"] in self._printfMapper else "x"
+										)
 									)
 								)
-							)
+							else:
+								f.write(
+									(
+										'	if({0}C != {0}) {{\n'
+										'		if(!invalidDataFound) {{\n'
+										'			PRINT_FAIL();\n'
+										'			invalidDataFound = true;\n'
+										'		}}\n'
+										'		printf("Variable {0}: expected %{1} got %{1}.\\n", i, {0}C, {0});\n'
+										'	}}\n'.format(
+											v.attrib["name"],
+											self._printfMapper[v.attrib["type"]] if v.attrib["type"] in self._printfMapper else "x"
+										)
+									)
+								)
 
 			f.write(
 				(
