@@ -813,7 +813,7 @@ class CodeEmitter:
 						for v in k:
 							if "ndrange" == v.tag:
 								for d in v:
-									if "local" == v.tag:
+									if "local" == d.tag:
 										localSize = "localSize{}".format(k.attrib["name"].title())
 
 						f.write(
@@ -844,7 +844,7 @@ class CodeEmitter:
 					for v in k:
 						if "ndrange" == v.tag:
 							for d in v:
-								if "local" == v.tag:
+								if "local" == d.tag:
 									localSize = "localSize{}".format(k.attrib["name"].title())
 
 					f.write(
