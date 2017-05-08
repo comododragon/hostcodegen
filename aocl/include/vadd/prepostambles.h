@@ -22,8 +22,10 @@
 /* * DEALINGS IN THE SOFTWARE.                                                                 * */
 /* ********************************************************************************************* */
 
-#define PREAMBLE(a, aSz, b, bSz, c, cSz, cC, cCSz) {\
+#define PREAMBLE(offset, a, aSz, b, bSz, c, cSz, cC, cCSz) {\
 	int _i = 0;\
+\
+	offset = 1;\
 \
 	for(_i = 0; _i < bSz; _i++) {\
 		b[_i].s[0] = _i;\

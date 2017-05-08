@@ -211,15 +211,20 @@ class CodeEmitter:
 					)
 
 					firstExec = True
-					for v in self._varNameList[::2]:
+					for v, n in zip(self._varNameList[::2], self._varNameList[1::2]):
 						if not firstExec:
 							f.write(', ')
 						else:
 							firstExec = False
 
 						f.write(
-							'{0}, {0}Sz'.format(v)
+							'{}'.format(v)
 						)
+
+						if int(n) > 1:
+							f.write(
+								', {}Sz'.format(v)
+							)
 
 					if usesLoopVar[i]:
 						f.write(', loopFlag);\n')
@@ -232,11 +237,13 @@ class CodeEmitter:
 
 				for i in range(0, len(self._varNameList), 2):
 					f.write(
-						(
-							' *            {0}: variable ({1});\n'
-							' *            {0}Sz: number of members in variable (unsigned int);\n'.format(self._varNameList[i], self._varTypeList[i])
-						)
+						' *            {0}: variable ({1});\n'.format(self._varNameList[i], self._varTypeList[i])
 					)
+
+					if int(self._varNameList[i + 1]) > 1:
+						f.write(
+							' *            {}Sz: number of members in variable (unsigned int);\n'.format(self._varNameList[i])
+						)
 
 				f.write(
 					(
@@ -469,13 +476,16 @@ class CodeEmitter:
 
 				# Print arguments
 				firstExec = True
-				for v in self._varNameList:
+				for v, n in zip(self._varNameList[::2], self._varNameList[1::2]):
 					if not firstExec:
 						f.write(', ')
 					else:
 						firstExec = False
 
 					f.write(v)
+
+					if int(n) > 1:
+						f.write(', {}'.format(n))
 
 				f.write(
 					(
@@ -689,10 +699,13 @@ class CodeEmitter:
 					'		LOOPPREAMBLE('
 				)
 
-				for v in self._varNameList:
+				for v, n in zip(self._varNameList[::2], self._varNameList[1::2]):
 					f.write(
 						'{}, '.format(v)
 					)
+
+					if int(n) > 1:
+						f.write('{}, '.format(n))
 
 				f.write(
 					(
@@ -903,10 +916,13 @@ class CodeEmitter:
 					'		LOOPPOSTAMBLE('
 				)
 
-				for v in self._varNameList:
+				for v, n in zip(self._varNameList[::2], self._varNameList[1::2]):
 					f.write(
 						'{}, '.format(v)
 					)
+
+					if int(n) > 1:
+						f.write('{}, '.format(n))
 
 				f.write(
 					(
@@ -933,13 +949,16 @@ class CodeEmitter:
 				)
 
 				firstExec = True
-				for v in self._varNameList:
+				for v, n in zip(self._varNameList[::2], self._varNameList[1::2]):
 					if not firstExec:
 						f.write(', ')
 					else:
 						firstExec = False
 
 					f.write(v)
+
+					if int(n) > 1:
+						f.write(', {}'.format(n))
 
 				f.write(
 					(

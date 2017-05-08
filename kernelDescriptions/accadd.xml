@@ -15,7 +15,8 @@
 					cC: pointer to output validation variable of output c;
 					cCSz: number of members in array pointed by cC.
 			Please note that this is a macro function (mind your scopes!). All pre/postamble macro functions are expected
-			to be implemented in a header named prepostambles.h.
+			to be implemented in a header named prepostambles.h. Variables without a proper argument for their sizes
+			(e.g. aSz for a) are inferred as being of size 1.
 		postamble: (optional) if "yes", all input/output variables will be passed as argument to a macro function
 			for custom final logic (free data, etc.). The postamble macro function header is similar to preamble's
 			(see previous example).

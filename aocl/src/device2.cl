@@ -29,8 +29,8 @@
  * @param c Resulting vector.
  * @param d Another resulting vector.
  */
-__kernel void addXY(__global double2 * restrict a, __global double2 * restrict b, __global double2 * restrict c) {
+__kernel void addXY(double off, __global double2 * restrict a, __global double2 * restrict b, __global double2 * restrict c) {
 	int i = get_global_id(0);
-	c[i].x = a[i].x + b[i].x;
+	c[i].x = a[i].x + b[i].x + off;
 	c[i].y = a[i].y + b[i].y;
 }

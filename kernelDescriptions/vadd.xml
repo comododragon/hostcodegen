@@ -4,8 +4,9 @@
 		<ndrange dim="1">
 			<global>5</global>
 		</ndrange>
-		<input name="a" type="cl_double2" nmemb="5" arg="0">{4, 0}, {3,1}, {2, 2}, {1, 3}, {0, 4}</input>
-		<input name="b" type="cl_double2" nmemb="5" arg="1" />
-		<output name="c" type="cl_double2" nmemb="5" arg="2">{4, 4}, {4, 4}, {4, 4}, {4, 4}, {4, 4}</output>
+		<input name="offset" type="double" nmemb="1" arg="0" />
+		<input name="a" type="cl_double2" nmemb="5" arg="1">{4, 0}, {3,1}, {2, 2}, {1, 3}, {0, 4}</input>
+		<input name="b" type="cl_double2" nmemb="5" arg="2" />
+		<output name="c" type="cl_double2" nmemb="5" arg="3">{5, 4}, {5, 4}, {5, 4}, {5, 4}, {5, 4}</output>
 	</kernel>
 </kernels>
