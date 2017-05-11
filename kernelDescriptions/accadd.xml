@@ -50,7 +50,7 @@
 			Input nodes provide input data for the kernel. The content of this tag is the input
 			data itself. Attributes:
 				name: variable name;
-				type: C-compatible type of variable;
+				type: C-compatible type of variable (vector types of OpenCL, like cl_double2 are supported);
 				nmemb: number of members. If nmemb = 1, variable will be directly passed to the
 					kernel without the use of cl_mem buffers;
 				arg: argument position for kernel. This is the arg_index value of clSetKernelArg;
@@ -61,12 +61,13 @@
 			Output nodes provide information of expected kernel's output. The content of this tag is the
 			expected output data to be validated. Attributes:
 				name: variable name;
-				type: C-compatible type of variable;
+				type: C-compatible type of variable (vector types of OpenCL, like cl_double2 are supported);
 				nmemb: number of members;
 				arg: argument position for kernel. This is the arg_index value of clSetKernelArg;
 				novalidation: (optional) if "true", validation variable ("<varname>C") will not be generated.
+				epsilon: (optional) specify an error range for validation. If omitted, output data must be equal to validation data.
 		-->
-		<output name="c" type="float" nmemb="10" arg="2">27, 25, 23, 21, 19, 17, 15, 13, 11, 9</output>
+		<output name="c" type="float" nmemb="10" arg="2" epsilon="0.5">27.3, 24.7, 23, 21, 19, 17, 15.1, 13, 11, 9</output>
 		<output name="d" type="float" nmemb="10" arg="3" />
 	</kernel>
 </kernels>

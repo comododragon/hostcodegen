@@ -257,6 +257,15 @@ class CodeEmitter:
 			f.write(
 				(
 					'/**\n'
+					' * @brief Test if two operands are outside an epsilon range.\n'
+					' *\n'
+					' * @param a First operand.\n'
+					' * @param b Second operand.\n'
+					' * @param e Epsilon value.\n'
+					' */\n'
+					'#define TEST_EPSILON(a, b, e) (((a > b) && (a - b > e)) || ((b >= a) && (b - a > e)))\n'
+					'\n'
+					'/**\n'
 					' * @brief Standard statements for function error handling and printing.\n'
 					' *\n'
 					' * @param funcName Function name that failed.\n'
@@ -459,6 +468,11 @@ class CodeEmitter:
 									f.write(
 										'	{} {}C = {};\n'.format(v.attrib["type"], v.attrib["name"], v.text)
 									)
+							# Epsilon variable (if supplied)
+							if "epsilon" in v.attrib:
+								f.write(
+									'	double {}Epsilon = {};\n'.format(v.attrib["name"], v.attrib["epsilon"])
+								)
 
 						# Part 3: device variable
 						f.write(
@@ -985,76 +999,112 @@ class CodeEmitter:
 						if v.attrib["type"] in self._vectorTypes:
 							vectorType = self._vectorTypes[v.attrib["type"]]
 							if int(v.attrib["nmemb"]) > 1:
+								if "epsilon" in v.attrib:
+									validationStr = 'TEST_EPSILON({0}C[i].s[j], {0}[i].s[j], {0}Epsilon)'.format(v.attrib["name"])
+									validationStr2 = ' (with epsilon)'
+								else: 
+									validationStr = '{0}C[i].s[j] != {0}[i].s[j]'.format(v.attrib["name"])
+									validationStr2 = ''
+
 								f.write(
 									(
 										'	for(i = 0; i < {0}; i++) {{\n'
 										'		for(j = 0; j < {1}; j++) {{\n'
-										'			if({2}C[i].s[j] != {2}[i].s[j]) {{\n'
+										'			if({2}) {{\n'
 										'				if(!invalidDataFound) {{\n'
 										'					PRINT_FAIL();\n'
 										'					invalidDataFound = true;\n'
 										'				}}\n'
-										'				printf("Variable {2}[%d].s[%d]: expected %{3} got %{3}.\\n", i, j, {2}C[i].s[j], {2}[i].s[j]);\n'
+										'				printf("Variable {3}[%d].s[%d]: expected %{4} got %{4}{5}.\\n", i, j, {3}C[i].s[j], {3}[i].s[j]);\n'
 										'			}}\n'
 										'		}}\n'
 										'	}}\n'.format(
 											v.attrib["nmemb"],
 											vectorType[0],
+											validationStr,
 											v.attrib["name"],
-											self._printfMapper[vectorType[1]] if vectorType[1] in self._printfMapper else "x"
+											self._printfMapper[vectorType[1]] if vectorType[1] in self._printfMapper else "x",
+											validationStr2
 										)
 									)
 								)
 							else:
+								if "epsilon" in v.attrib:
+									validationStr = 'TEST_EPSILON({0}C.s[i], {0}.s[i], {0}Epsilon)'.format(v.attrib["name"])
+									validationStr2 = ' (with epsilon)'
+								else: 
+									validationStr = '{0}C.s[i] != {0}.s[i]'.format(v.attrib["name"])
+									validationStr2 = ''
+
 								f.write(
 									(
 										'	for(i = 0; i < {0}; i++) {{\n'
-										'		if({1}C.s[i] != {1}.s[i]) {{\n'
+										'		if({1}) {{\n'
 										'			if(!invalidDataFound) {{\n'
 										'				PRINT_FAIL();\n'
 										'				invalidDataFound = true;\n'
 										'			}}\n'
-										'			printf("Variable {1}.s[%d]: expected %{2} got %{2}.\\n", i, {1}C.s[j], {1}.s[j]);\n'
+										'			printf("Variable {2}.s[%d]: expected %{3} got %{3}{4}.\\n", i, {2}C.s[j], {2}.s[j]);\n'
 										'		}}\n'
 										'	}}\n'.format(
 											vectorType[0],
+											validationStr,
 											v.attrib["name"],
-											self._printfMapper[vectorType[1]] if vectorType[1] in self._printfMapper else "x"
+											self._printfMapper[vectorType[1]] if vectorType[1] in self._printfMapper else "x",
+											validationStr2
 										)
 									)
 								)
 						# Not vector type variable
 						else:
 							if int(v.attrib["nmemb"]) > 1:
+								if "epsilon" in v.attrib:
+									validationStr = 'TEST_EPSILON({0}C[i],  {0}[i], {0}Epsilon)'.format(v.attrib["name"])
+									validationStr2 = ' (with epsilon)'
+								else: 
+									validationStr = '{0}C[i] != {0}[i]'.format(v.attrib["name"])
+									validationStr2 = ''
+
 								f.write(
 									(
 										'	for(i = 0; i < {0}; i++) {{\n'
-										'		if({1}C[i] != {1}[i]) {{\n'
+										'		if({1}) {{\n'
 										'			if(!invalidDataFound) {{\n'
 										'				PRINT_FAIL();\n'
 										'				invalidDataFound = true;\n'
 										'			}}\n'
-										'			printf("Variable {1}[%d]: expected %{2} got %{2}.\\n", i, {1}C[i], {1}[i]);\n'
+										'			printf("Variable {2}[%d]: expected %{3} got %{3}{4}.\\n", i, {2}C[i], {2}[i]);\n'
 										'		}}\n'
 										'	}}\n'.format(
 											v.attrib["nmemb"],
+											validationStr,
 											v.attrib["name"],
-											self._printfMapper[v.attrib["type"]] if v.attrib["type"] in self._printfMapper else "x"
+											self._printfMapper[v.attrib["type"]] if v.attrib["type"] in self._printfMapper else "x",
+											validationStr2
 										)
 									)
 								)
 							else:
+								if "epsilon" in v.attrib:
+									validationStr = 'TEST_EPSILON({0}C, {0}, {0}Epsilon)'.format(v.attrib["name"])
+									validationStr2 = ' (with epsilon)'
+								else: 
+									validationStr = '{0}C != {0}'.format(v.attrib["name"])
+									validationStr2 = ''
+
 								f.write(
 									(
-										'	if({0}C != {0}) {{\n'
+										'	if({0}) {{\n'
 										'		if(!invalidDataFound) {{\n'
 										'			PRINT_FAIL();\n'
 										'			invalidDataFound = true;\n'
 										'		}}\n'
-										'		printf("Variable {0}: expected %{1} got %{1}.\\n", i, {0}C, {0});\n'
+										'		printf("Variable {1}: expected %{2} got %{2}{3}.\\n", i, {1}C, {1});\n'
 										'	}}\n'.format(
+											validationStr,
 											v.attrib["name"],
-											self._printfMapper[v.attrib["type"]] if v.attrib["type"] in self._printfMapper else "x"
+											self._printfMapper[v.attrib["type"]] if v.attrib["type"] in self._printfMapper else "x",
+											validationStr2
 										)
 									)
 								)
