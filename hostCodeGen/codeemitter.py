@@ -694,6 +694,19 @@ class CodeEmitter:
 								'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clSetKernelArg ({2}K)"));\n'.format(k.attrib["name"].title(), v.attrib["arg"], v.attrib["name"])
 							)
 						)
+					# Arguments with __local keyword
+					elif "local" == v.tag:
+						f.write(
+							(
+								'	fRet = clSetKernelArg(kernel{0}, {1}, {2} * sizeof({3}), NULL);\n'
+								'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clSetKernelArg (__local {1})"));\n'.format(
+									k.attrib["name"].title(),
+									v.attrib["arg"],
+									v.attrib["nmemb"],
+									v.attrib["type"]
+								)
+							)
+						)
 
 				f.write(
 					'	PRINT_SUCCESS();\n'

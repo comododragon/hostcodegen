@@ -57,7 +57,7 @@ All kernels to be executed by the host must be described on an XML file. An exam
 </kernels>
 ```
 
-Descriptions for each tag and attributes are available on the file itself.
+Descriptions for each tag and attributes are available on the xml files.
 
 ### Generating host code
 

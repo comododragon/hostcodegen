@@ -28,9 +28,11 @@
  * @param b Second operand.
  * @param c Resulting vector.
  * @param d Another resulting vector.
+ * @param tmp Local vector to save temporaries.
  */
-__kernel void addXY(double off, __global double2 * restrict a, __global double2 * restrict b, __global double2 * restrict c) {
+__kernel void addXY(double off, __global double2 * restrict a, __global double2 * restrict b, __global double2 * restrict c, __local double * tmp) {
 	int i = get_global_id(0);
-	c[i].x = a[i].x + b[i].x + off;
+	tmp[i] = a[i].x + b[i].x;
+	c[i].x = tmp[i] + off;
 	c[i].y = a[i].y + b[i].y;
 }
