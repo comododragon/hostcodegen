@@ -138,5 +138,9 @@ if "__main__" == __name__:
 	ce.printFreeFinalOpenCL()
 	ce.printSeparator()
 
+	print("Printing cleanup function...")
+	ce.printCleanup()
+	ce.printSeparator()
+
 	print("Printing footer...")
 	ce.printFooter()

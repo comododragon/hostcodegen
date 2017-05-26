@@ -18,7 +18,7 @@
 			to be implemented in a header named prepostambles.h. Variables without a proper argument for their sizes
 			(e.g. aSz for a) are inferred as being of size 1.
 		postamble: (optional) if "yes", all input/output variables will be passed as argument to a macro function
-			for custom final logic (free data, etc.). The postamble macro function header is similar to preamble's
+			for custom final logic (postprocessing, etc.). The postamble macro function header is similar to preamble's
 			(see previous example).
 		looppreamble: (optional) if "yes", all input/output variables will be passed as argument to a macro
 			function for custom initial logic inside the loop. Example: The looppreamble macro function header is similar
@@ -27,8 +27,11 @@
 		looppostamble: (optional) if "yes", all input/output variables will be passed as argument to a macro
 			function for custom final logic inside the loop. Example: The looppostamble macro function header is similar
 			to looppreamble's (see previous example).
+		cleanup: (optional) if "yes", all input/output variables will be passed as argument to a macro function
+			for custom final logic (free data, etc.). This function is called just before main() returns. The cleanup
+			macro function header is similar to preamble's (see previous example).
 -->
-<kernels program="program.aocx" preamble="yes" postamble="yes" looppreamble="yes" looppostamble="yes">
+<kernels program="program.aocx" preamble="yes" postamble="yes" looppreamble="yes" looppostamble="yes" cleanup="yes">
 	<!--
 		This is a kernel node. One or more may be provided. The following attributes are possible:
 			name: name of kernel function;

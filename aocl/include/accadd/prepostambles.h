@@ -22,20 +22,24 @@
 /* * DEALINGS IN THE SOFTWARE.                                                                 * */
 /* ********************************************************************************************* */
 
-int _counter;
+int gCounter;
+float *gRedundantUnnecessaryDynamicExampleVar = NULL;\
 
 #define PREAMBLE(a, aSz, b, bSz, c, cSz, cC, cCSz, d, dSz, dC, dCSz) {\
 	int _i;\
 	float _example[10] = {57, 54, 51, 48, 45, 42, 39, 36, 33, 30};\
 \
-	_counter = 0;\
+	gRedundantUnnecessaryDynamicExampleVar = malloc(10 * sizeof(float));\
+	memcpy(gRedundantUnnecessaryDynamicExampleVar, _example, 10 * sizeof(float));\
+\
+	gCounter = 0;\
 \
 	for(_i = 0; _i < bSz; _i++)\
 		b[_i] = _i;\
 	for(_i = 0; _i < dSz; _i++)\
 		d[_i] = 0;\
 	for(_i = 0; _i < dCSz; _i++)\
-		dC[_i] = _example[_i];\
+		dC[_i] = gRedundantUnnecessaryDynamicExampleVar[_i];\
 }
 
 #define LOOPPREAMBLE(a, aSz, b, bSz, c, cSz, cC, cCSz, d, dSz, dC, dCSz, loopFlag) {\
@@ -49,9 +53,14 @@ int _counter;
 	for(_i = 0; _i < bSz; _i++)\
 		b[_i] = c[_i];\
 \
-	_counter++;\
-	loopFlag = (_counter < 3);\
+	gCounter++;\
+	loopFlag = (gCounter < 3);\
 }
 
 #define POSTAMBLE(a, aSz, b, bSz, c, cSz, cC, cCSz, d, dSz, dC, dCSz) {\
+}
+
+#define CLEANUP(a, aSz, b, bSz, c, cSz, cC, cCSz, d, dSz, dC, dCSz) {\
+	if(gRedundantUnnecessaryDynamicExampleVar)\
+		free(gRedundantUnnecessaryDynamicExampleVar);\
 }

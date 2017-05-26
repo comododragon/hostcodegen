@@ -194,7 +194,7 @@ class CodeEmitter:
 						self._varNameList.append(v.attrib["nmemb"])
 
 			# If any PRE/POSTAMBLE function was enabled, include the respective header
-			if ("preamble" or  "postamble" or "looppreamble" or "looppostamble") in self._xmlRoot.attrib:
+			if ("preamble" or  "postamble" or "looppreamble" or "looppostamble" or "cleanup") in self._xmlRoot.attrib:
 				f.write(
 					(
 						'/**\n'
@@ -203,8 +203,8 @@ class CodeEmitter:
 					)
 				)
 
-				functions = ("PREAMBLE", "POSTAMBLE", "LOOPPREAMBLE", "LOOPPOSTAMBLE")
-				usesLoopVar = (False, False, True, True)
+				functions = ("PREAMBLE", "POSTAMBLE", "LOOPPREAMBLE", "LOOPPOSTAMBLE", "CLEANUP")
+				usesLoopVar = (False, False, True, True, False)
 				for i in range(0, len(functions)):
 					f.write(
 						' *            {}('.format(functions[i])
@@ -964,7 +964,6 @@ class CodeEmitter:
 			)
 
 
-	# TODO: Put here or with deallocs?
 	# Print postamble
 	def printPostamble(self):
 		with open(self._targetFile, "a") as f:
@@ -1218,6 +1217,34 @@ class CodeEmitter:
 					'		free(platforms);\n'
 				)
 			)
+
+
+	# Print cleanup function
+	def printCleanup(self):
+		with open(self._targetFile, "a") as f:
+			# Call CLEANUP function if "cleanup" attribute is "yes"
+			if "cleanup" in self._xmlRoot.attrib and "yes" == self._xmlRoot.attrib["cleanup"]:
+				f.write(
+					'	/* Calling cleanup function */\n'
+					'	CLEANUP('
+				)
+
+				# Print arguments
+				firstExec = True
+				for v, n in zip(self._varNameList[::2], self._varNameList[1::2]):
+					if not firstExec:
+						f.write(', ')
+					else:
+						firstExec = False
+
+					f.write(v)
+
+					if int(n) > 1:
+						f.write(', {}'.format(n))
+
+				f.write(
+					');\n'
+				)
 
 
 	# Print last part of code
