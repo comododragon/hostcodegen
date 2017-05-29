@@ -404,13 +404,16 @@ class CodeEmitter:
 						if v.text is None:
 							if int(v.attrib["nmemb"]) > 1:
 								f.write(
-									'	{} {}[{}];\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"])
+									'	{0} *{1} = malloc({2} * sizeof({0}));\n'.format(
+										v.attrib["type"], v.attrib["name"], v.attrib["nmemb"]
+									)
 								)
 							else:
 								f.write(
 									'	{} {};\n'.format(v.attrib["type"], v.attrib["name"])
 								)
 						# Explicit variable initialisation
+						# XXX: Note that big variables may lead to stack overflow!
 						else:
 							if int(v.attrib["nmemb"]) > 1:
 								f.write(
@@ -435,7 +438,9 @@ class CodeEmitter:
 						# For output, initialisation data must come from PREAMBLE.
 						if int(v.attrib["nmemb"]) > 1:
 							f.write(
-								'	{} {}[{}];\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"])
+								'	{0} *{1} = malloc({2} * sizeof({0}));\n'.format(
+									v.attrib["type"], v.attrib["name"], v.attrib["nmemb"]
+								)
 							)
 						else:
 							f.write(
@@ -455,6 +460,7 @@ class CodeEmitter:
 										'	{} {}C;\n'.format(v.attrib["type"], v.attrib["name"])
 									)
 							# Explicit variable assignment
+							# XXX: Note that big variables may lead to stack overflow!
 							else:
 								if int(v.attrib["nmemb"]) > 1:
 									f.write(
@@ -1153,6 +1159,29 @@ class CodeEmitter:
 								'		clReleaseMemObject({0}K);\n'.format(v.attrib["name"])
 							)
 						)
+
+
+	# Print variable deallocs section
+	def printFreeVariables(self):
+		with open(self._targetFile, "a") as f:
+			f.write(
+				'	/* Dealloc variables */\n'
+			)
+
+			# Iterate through every variable of every kernel
+			for k in self._xmlRoot:
+				for v in k:
+					if "input" == v.tag:
+						if v.text is None:
+							if int(v.attrib["nmemb"]) > 1:
+								f.write(
+									'	free({});\n'.format(v.attrib["name"])
+								)
+					elif "output" == v.tag:
+						if int(v.attrib["nmemb"]) > 1:
+							f.write(
+								'	free({});\n'.format(v.attrib["name"])
+							)
 
 
 	# Print clReleaseKernel section

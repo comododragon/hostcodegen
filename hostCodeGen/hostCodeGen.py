@@ -122,6 +122,10 @@ if "__main__" == __name__:
 	ce.printFreeBuffers()
 	ce.printSeparator()
 
+	print("Printing variable deallocs...")
+	ce.printFreeVariables()
+	ce.printSeparator()
+
 	print("Printing kernels deallocation sections...")
 	ce.printFreeKernels()
 	ce.printSeparator()
