@@ -194,7 +194,7 @@ class CodeEmitter:
 						self._varNameList.append(v.attrib["nmemb"])
 
 			# If any PRE/POSTAMBLE function was enabled, include the respective header
-			if ("preamble" or  "postamble" or "looppreamble" or "looppostamble" or "cleanup") in self._xmlRoot.attrib:
+			if any(x in ["preamble", "postamble", "looppreamble", "looppostamble", "cleanup"] for x in self._xmlRoot.attrib):
 				f.write(
 					(
 						'/**\n'
