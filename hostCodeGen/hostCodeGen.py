@@ -114,6 +114,10 @@ if "__main__" == __name__:
 	ce.printValidation()
 	ce.printSeparator()
 
+	print("Printing profile section...")
+	ce.printProfileResults()
+	ce.printSeparator()
+
 	print("Printing error goto label...")
 	ce.printErrorLabel()
 	ce.printSeparator()

@@ -343,6 +343,15 @@ class CodeEmitter:
 				)
 			)
 
+			# If profiling is on, add timer variables
+			if "profile" in self._xmlRoot.attrib and "yes" == self._xmlRoot.attrib["profile"]:
+				f.write(
+					(
+						'	struct timeval then, now;\n'
+						'	long execTime = 0;\n'
+					)
+				)
+
 			# Iterate through every kernel
 			for k in self._xmlRoot:
 				for v in k:
@@ -815,6 +824,7 @@ class CodeEmitter:
 	def printEnqueueKernel(self):
 		with open(self._targetFile, "a") as f:
 			hasOrder = False
+			profile = "profile" in self._xmlRoot.attrib and "yes" == self._xmlRoot.attrib["profile"]
 			kernels = {}
 			orderedIndexes = []
 
@@ -850,6 +860,12 @@ class CodeEmitter:
 					)
 				)
 
+				# If profiling is on, get "then"
+				if profile:
+					f.write(
+						'		gettimeofday(&then, NULL);\n'
+					)
+
 				# Iterate through all orders
 				for i in range(0, len(orderedIndexes)):
 					# Get kernel based on order and enqueue it
@@ -875,6 +891,12 @@ class CodeEmitter:
 							)
 						)
 
+				# If profiling is on, get "now"
+				if profile:
+					f.write(
+						'		gettimeofday(&now, NULL);\n'
+					)
+
 				f.write(
 					'		PRINT_SUCCESS();\n'
 				)
@@ -883,6 +905,12 @@ class CodeEmitter:
 				f.write(
 					'		PRINT_STEP("[%d] Running kernels...", i);\n'
 				)
+
+				# If profiling is on, get "then"
+				if profile:
+					f.write(
+						'		gettimeofday(&then, NULL);\n'
+					)
 
 				for k in self._xmlRoot:
 					dim = "1"
@@ -901,6 +929,12 @@ class CodeEmitter:
 								localSize
 							)
 						)
+					)
+
+				# If profiling is on, get "now"
+				if profile:
+					f.write(
+						'		gettimeofday(&now, NULL);\n'
 					)
 
 				f.write(
@@ -964,9 +998,16 @@ class CodeEmitter:
 					)
 				)
 
+			if "profile" in self._xmlRoot.attrib and "yes" == self._xmlRoot.attrib["profile"]:
+				f.write(
+					'		execTime += now.tv_usec - then.tv_usec;\n'
+				)
+
 			f.write(
-				'		i++;\n'
-				'	} while(loopFlag);\n'
+				(
+					'		i++;\n'
+					'	} while(loopFlag);\n'
+				)
 			)
 
 
@@ -1133,6 +1174,18 @@ class CodeEmitter:
 					'		PRINT_SUCCESS();\n'
 				)
 			)
+
+
+	# Print code for output validation
+	def printProfileResults(self):
+		with open(self._targetFile, "a") as f:
+			if "profile" in self._xmlRoot.attrib and "yes" == self._xmlRoot.attrib["profile"]:
+				f.write(
+					(
+						'	/* Print profiling results */\n'
+						'	printf("Elapsed time spent on kernels: %ld us; Average time per iteration: %ld us.\\n", execTime, execTime / i);\n'
+					)
+				)
 
 
 	# Print error label
