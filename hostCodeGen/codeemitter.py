@@ -319,7 +319,7 @@ class CodeEmitter:
 				(
 					'	FILE *programFile = NULL;\n'
 					'	long programSz;\n'
-					'	char *programBin = NULL;\n'
+					'	char *programContent = NULL;\n'
 					'	cl_int programRet;\n'
 					'	cl_program program = NULL;\n'
 				)
@@ -606,9 +606,11 @@ class CodeEmitter:
 	# Print clCreateProgramWithBinary and clBuildProgram section
 	def printCreateAndBuildProgram(self):
 		with open(self._targetFile, "a") as f:
+			filename = self._xmlRoot.attrib["program"] if "program" in self._xmlRoot.attrib else self._xmlRoot.attrib["binary"]
+
 			f.write(
 				(
-					'	/* Open aocx file */\n'
+					'	/* Open binary file */\n'
 					'	PRINT_STEP("Opening program binary...");\n'
 					'	programFile = fopen("{0}", "rb");\n'
 					'	ASSERT_CALL(programFile, POSIX_ERROR_STATEMENTS("{0}"));\n'
@@ -619,24 +621,46 @@ class CodeEmitter:
 					'	fseek(programFile, 0, SEEK_END);\n'
 					'	programSz = ftell(programFile);\n'
 					'	fseek(programFile, 0, SEEK_SET);\n'
-					'	programBin = malloc(programSz);\n'
-					'	fread(programBin, programSz, 1, programFile);\n'
+					'	programContent = malloc(programSz);\n'
+					'	fread(programContent, programSz, 1, programFile);\n'
 					'	fclose(programFile);\n'
 					'	programFile = NULL;\n'
 					'	PRINT_SUCCESS();\n'
-					'\n'
-					'	/* Create program from aocx file */\n'
-					'	PRINT_STEP("Creating program from binary...");\n'
-					'	program = clCreateProgramWithBinary(context, 1, devices, &programSz, (const unsigned char **) &programBin, &programRet, &fRet);\n'
-					'	ASSERT_CALL(CL_SUCCESS == programRet, FUNCTION_ERROR_STATEMENTS("clCreateProgramWithBinary (when loading aocx)"));\n'
-					'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateProgramWithBinary"));\n'
-					'	PRINT_SUCCESS();\n'
-					'\n'
+					'\n'.format(filename)
+				)
+			)
+
+			if "program" in self._xmlRoot.attrib:
+				f.write(
+					(
+						'	/* Create program from binary file */\n'
+						'	PRINT_STEP("Creating program from binary...");\n'
+						'	program = clCreateProgramWithBinary(context, 1, devices, &programSz, (const unsigned char **) &programContent, &programRet, &fRet);\n'
+						'	ASSERT_CALL(CL_SUCCESS == programRet, FUNCTION_ERROR_STATEMENTS("clCreateProgramWithBinary (when loading binary)"));\n'
+						'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateProgramWithBinary"));\n'
+						'	PRINT_SUCCESS();\n'
+						'\n'
+					)
+				)
+			else:
+				f.write(
+					(
+						'	/* Create program from source file */\n'
+						'	PRINT_STEP("Creating program from source...");\n'
+						'	program = clCreateProgramWithSource(context, 1, (const char **) &programContent, &programSz, &fRet);\n'
+						'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateProgramWithSource"));\n'
+						'	PRINT_SUCCESS();\n'
+						'\n'
+					)
+				)
+
+			f.write(
+				(
 					'	/* Build program */\n'
 					'	PRINT_STEP("Building program...");\n'
 					'	fRet = clBuildProgram(program, 1, devices, NULL, NULL, NULL);\n'
 					'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clBuildProgram"));\n'
-					'	PRINT_SUCCESS();\n'.format(self._xmlRoot.attrib["program"])
+					'	PRINT_SUCCESS();\n'
 				)
 			)
 
@@ -1289,8 +1313,8 @@ class CodeEmitter:
 					'	/* Dealloc program */\n'
 					'	if(program)\n'
 					'		clReleaseProgram(program);\n'
-					'	if(programBin)\n'
-					'		free(programBin);\n'
+					'	if(programContent)\n'
+					'		free(programContent);\n'
 					'	if(programFile)\n'
 					'		fclose(programFile);\n'
 				)

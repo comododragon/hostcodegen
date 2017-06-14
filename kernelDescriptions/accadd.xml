@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
 	This is the root kernel. The following attributes are possible:
-		program: name of generated program file (e.g. for Intel FPGA OpenCL: program.aocx);
+		binary: name of generated binary (e.g. for Intel FPGA OpenCL: program.aocx). This attribute must be present if "source" is omitted;
+		source: name of kernel source (e.g. kernel.cl). This attribute must be present if "binary" is omitted;
 		profile: if "yes", kernels execution times will be profiled and reported;
 		preamble: (optional) if "yes", all input/output variables will be passed as argument to a macro
 			function for custom initial logic. Example:
@@ -32,7 +33,7 @@
 			for custom final logic (free data, etc.). This function is called just before main() returns. The cleanup
 			macro function header is similar to preamble's (see previous example).
 -->
-<kernels program="program.aocx" profile="yes" preamble="yes" postamble="yes" looppreamble="yes" looppostamble="yes" cleanup="yes">
+<kernels binary="program.aocx" profile="yes" preamble="yes" postamble="yes" looppreamble="yes" looppostamble="yes" cleanup="yes">
 	<!--
 		This is platform-device description node. If omitted, device[0] from platform[0] will be used. The following
 		attributes are possible:

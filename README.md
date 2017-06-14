@@ -44,7 +44,7 @@ All kernels to be executed by the host must be described on an XML file. An exam
 
 ```
 <?xml version="1.0" encoding="utf-8"?>
-<kernels program="program.aocx" profile="yes" preamble="yes" postamble="yes" looppreamble="yes" looppostamble="yes" cleanup="yes">
+<kernels binary="program.aocx" profile="yes" preamble="yes" postamble="yes" looppreamble="yes" looppostamble="yes" cleanup="yes">
 	<devinfo platform="0" device="0" />
 	<kernel name="add" order="1">
 		<ndrange dim="1">
