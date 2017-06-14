@@ -940,7 +940,10 @@ class CodeEmitter:
 				# If profiling is on, get "now"
 				if profile:
 					f.write(
-						'		gettimeofday(&now, NULL);\n'
+						(
+							'		clFinish(queue{});\n'
+							'		gettimeofday(&now, NULL);\n'.format(k.attrib["name"].title())
+						)
 					)
 
 				f.write(
