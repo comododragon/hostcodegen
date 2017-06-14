@@ -1096,6 +1096,18 @@ class CodeEmitter:
 
 
 	# Print code for output validation
+	def printProfileResults(self):
+		with open(self._targetFile, "a") as f:
+			if "profile" in self._xmlRoot.attrib and "yes" == self._xmlRoot.attrib["profile"]:
+				f.write(
+					(
+						'	/* Print profiling results */\n'
+						'	printf("Elapsed time spent on kernels: %ld us; Average time per iteration: %ld us.\\n", execTime, execTime / i);\n'
+					)
+				)
+
+
+	# Print code for output validation
 	def printValidation(self):
 		with open(self._targetFile, "a") as f:
 			f.write(
@@ -1229,18 +1241,6 @@ class CodeEmitter:
 					'		PRINT_SUCCESS();\n'
 				)
 			)
-
-
-	# Print code for output validation
-	def printProfileResults(self):
-		with open(self._targetFile, "a") as f:
-			if "profile" in self._xmlRoot.attrib and "yes" == self._xmlRoot.attrib["profile"]:
-				f.write(
-					(
-						'	/* Print profiling results */\n'
-						'	printf("Elapsed time spent on kernels: %ld us; Average time per iteration: %ld us.\\n", execTime, execTime / i);\n'
-					)
-				)
 
 
 	# Print error label

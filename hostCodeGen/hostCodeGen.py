@@ -110,12 +110,12 @@ if "__main__" == __name__:
 	ce.printPostamble()
 	ce.printSeparator()
 
-	print("Printing validation sections...")
-	ce.printValidation()
-	ce.printSeparator()
-
 	print("Printing profile section...")
 	ce.printProfileResults()
+	ce.printSeparator()
+
+	print("Printing validation sections...")
+	ce.printValidation()
 	ce.printSeparator()
 
 	print("Printing error goto label...")
