@@ -606,7 +606,7 @@ class CodeEmitter:
 	# Print clCreateProgramWithBinary and clBuildProgram section
 	def printCreateAndBuildProgram(self):
 		with open(self._targetFile, "a") as f:
-			filename = self._xmlRoot.attrib["program"] if "program" in self._xmlRoot.attrib else self._xmlRoot.attrib["binary"]
+			filename = self._xmlRoot.attrib["source"] if "source" in self._xmlRoot.attrib else self._xmlRoot.attrib["binary"]
 
 			f.write(
 				(
@@ -630,7 +630,7 @@ class CodeEmitter:
 				)
 			)
 
-			if "program" in self._xmlRoot.attrib:
+			if "binary" in self._xmlRoot.attrib:
 				f.write(
 					(
 						'	/* Create program from binary file */\n'
