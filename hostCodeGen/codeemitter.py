@@ -180,18 +180,19 @@ class CodeEmitter:
 
 			# Populate lists of arguments for PRE/POSTAMBLE functions
 			for k in self._xmlRoot:
-				for v in k:
-					if ("input" == v.tag) or ("output" == v.tag):
-						self._varTypeList.append("{}{}".format(v.attrib["type"], " *" if int(v.attrib["nmemb"]) > 1 else ""))
-						self._varNameList.append(v.attrib["name"])
-						self._varTypeList.append("unsigned int")
-						self._varNameList.append(v.attrib["nmemb"])
-
-					if ("output" == v.tag) and (("novalidation" not in v.attrib) or (v.attrib["novalidation"] != "true")):
-						self._varTypeList.append("{}{}".format(v.attrib["type"], " *" if int(v.attrib["nmemb"]) > 1 else ""))
-						self._varNameList.append("{}C".format(v.attrib["name"]))
-						self._varTypeList.append("unsigned int")
-						self._varNameList.append(v.attrib["nmemb"])
+				if "kernel" == k.tag:
+					for v in k:
+						if ("input" == v.tag) or ("output" == v.tag):
+							self._varTypeList.append("{}{}".format(v.attrib["type"], " *" if int(v.attrib["nmemb"]) > 1 else ""))
+							self._varNameList.append(v.attrib["name"])
+							self._varTypeList.append("unsigned int")
+							self._varNameList.append(v.attrib["nmemb"])
+	
+						if ("output" == v.tag) and (("novalidation" not in v.attrib) or (v.attrib["novalidation"] != "true")):
+							self._varTypeList.append("{}{}".format(v.attrib["type"], " *" if int(v.attrib["nmemb"]) > 1 else ""))
+							self._varNameList.append("{}C".format(v.attrib["name"]))
+							self._varTypeList.append("unsigned int")
+							self._varNameList.append(v.attrib["nmemb"])
 
 			# If any PRE/POSTAMBLE function was enabled, include the respective header
 			if any(x in ["preamble", "postamble", "looppreamble", "looppostamble", "cleanup"] for x in self._xmlRoot.attrib):
@@ -305,9 +306,10 @@ class CodeEmitter:
 	def printQueueDeclarations(self):
 		with open(self._targetFile, "a") as f:
 			for k in self._xmlRoot:
-				f.write(
-					'	cl_command_queue queue{} = NULL;\n'.format(k.attrib["name"].title())
-				)
+				if "kernel" == k.tag:
+					f.write(
+						'	cl_command_queue queue{} = NULL;\n'.format(k.attrib["name"].title())
+					)
 
 
 	# Print variable declarations related to the program
@@ -328,9 +330,10 @@ class CodeEmitter:
 	def printKernelDeclarations(self):
 		with open(self._targetFile, "a") as f:
 			for k in self._xmlRoot:
-				f.write(
-					'	cl_kernel kernel{} = NULL;\n'.format(k.attrib["name"].title())
-				)
+				if "kernel" == k.tag:
+					f.write(
+						'	cl_kernel kernel{} = NULL;\n'.format(k.attrib["name"].title())
+					)
 
 
 	# Print last declarations: some flags and other stuff
@@ -354,41 +357,42 @@ class CodeEmitter:
 
 			# Iterate through every kernel
 			for k in self._xmlRoot:
-				for v in k:
-					# Search for ndrange tag
-					if "ndrange" == v.tag:
-						# If no dim attribute is present, default it to 1
-						dim = v.attrib["dim"] if "dim" in v.attrib else "1"
-						f.write(
-							'	cl_uint workDim{} = {};\n'.format(k.attrib["name"].title(), dim)
-						)
-
-						# Set global and local (if any) dimensions
-						for d in v:
-							if "global" == d.tag:
-								f.write(
-									(
-										'	size_t globalSize{}[{}] = {{\n'
-										'		{}\n'
-										'	}};\n'.format(
-											k.attrib["name"].title(),
-											dim,
-											d.text
+				if "kernel" == k.tag:
+					for v in k:
+						# Search for ndrange tag
+						if "ndrange" == v.tag:
+							# If no dim attribute is present, default it to 1
+							dim = v.attrib["dim"] if "dim" in v.attrib else "1"
+							f.write(
+								'	cl_uint workDim{} = {};\n'.format(k.attrib["name"].title(), dim)
+							)
+	
+							# Set global and local (if any) dimensions
+							for d in v:
+								if "global" == d.tag:
+									f.write(
+										(
+											'	size_t globalSize{}[{}] = {{\n'
+											'		{}\n'
+											'	}};\n'.format(
+												k.attrib["name"].title(),
+												dim,
+												d.text
+											)
 										)
 									)
-								)
-							elif "local" == d.tag:
-								f.write(
-									(
-										'	size_t localSize{}[{}] = {{\n'
-										'		{}\n'
-										'	}};\n'.format(
-											k.attrib["name"].title(),
-											dim,
-											d.text
+								elif "local" == d.tag:
+									f.write(
+										(
+											'	size_t localSize{}[{}] = {{\n'
+											'		{}\n'
+											'	}};\n'.format(
+												k.attrib["name"].title(),
+												dim,
+												d.text
+											)
 										)
 									)
-								)
 
 
 	# Print a simple newline
@@ -406,11 +410,46 @@ class CodeEmitter:
 
 			# Iterate through every variable of every kernel
 			for k in self._xmlRoot:
-				for v in k:
-					if "input" == v.tag:
-						# Part 1: host variable
-						# Function is being used instead of explicit variable initialisation
-						if v.text is None:
+				if "kernel" == k.tag:
+					for v in k:
+						if "input" == v.tag:
+							# Part 1: host variable
+							# Function is being used instead of explicit variable initialisation
+							if v.text is None:
+								if int(v.attrib["nmemb"]) > 1:
+									f.write(
+										'	{0} *{1} = malloc({2} * sizeof({0}));\n'.format(
+											v.attrib["type"], v.attrib["name"], v.attrib["nmemb"]
+										)
+									)
+								else:
+									f.write(
+										'	{} {};\n'.format(v.attrib["type"], v.attrib["name"])
+									)
+							# Explicit variable initialisation
+							# XXX: Note that big variables may lead to stack overflow!
+							else:
+								if int(v.attrib["nmemb"]) > 1:
+									f.write(
+										(
+											'	{} {}[{}] = {{\n'
+											'		{}\n'
+											'	}};\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"], v.text)
+										)
+									)
+								else:
+									f.write(
+										'	{} {} = {};\n'.format(v.attrib["type"], v.attrib["name"], v.text)
+									)
+	
+							# Part 2: device variable
+							if int(v.attrib["nmemb"]) > 1:
+								f.write(
+									'	cl_mem {}K = NULL;\n'.format(v.attrib["name"])
+								)
+						elif "output" == v.tag:
+							# Part 1: host variable
+							# For output, initialisation data must come from PREAMBLE.
 							if int(v.attrib["nmemb"]) > 1:
 								f.write(
 									'	{0} *{1} = malloc({2} * sizeof({0}));\n'.format(
@@ -421,78 +460,44 @@ class CodeEmitter:
 								f.write(
 									'	{} {};\n'.format(v.attrib["type"], v.attrib["name"])
 								)
-						# Explicit variable initialisation
-						# XXX: Note that big variables may lead to stack overflow!
-						else:
-							if int(v.attrib["nmemb"]) > 1:
-								f.write(
-									(
-										'	{} {}[{}] = {{\n'
-										'		{}\n'
-										'	}};\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"], v.text)
+	
+							# Part 2: validation variable
+							if ("novalidation" not in v.attrib) or (v.attrib["novalidation"] != "true"):
+								# Function is being used instead of explicit validation variable assignment
+								if v.text is None:
+									if int(v.attrib["nmemb"]) > 1:
+										f.write(
+											'	{} {}C[{}];\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"])
+										)
+									else:
+										f.write(
+											'	{} {}C;\n'.format(v.attrib["type"], v.attrib["name"])
+										)
+								# Explicit variable assignment
+								# XXX: Note that big variables may lead to stack overflow!
+								else:
+									if int(v.attrib["nmemb"]) > 1:
+										f.write(
+											(
+												'	{} {}C[{}] = {{\n'
+												'		{}\n'
+												'	}};\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"], v.text)
+											)
+										)
+									else:
+										f.write(
+											'	{} {}C = {};\n'.format(v.attrib["type"], v.attrib["name"], v.text)
+										)
+								# Epsilon variable (if supplied)
+								if "epsilon" in v.attrib:
+									f.write(
+										'	double {}Epsilon = {};\n'.format(v.attrib["name"], v.attrib["epsilon"])
 									)
-								)
-							else:
-								f.write(
-									'	{} {} = {};\n'.format(v.attrib["type"], v.attrib["name"], v.text)
-								)
-
-						# Part 2: device variable
-						if int(v.attrib["nmemb"]) > 1:
+	
+							# Part 3: device variable
 							f.write(
 								'	cl_mem {}K = NULL;\n'.format(v.attrib["name"])
 							)
-					elif "output" == v.tag:
-						# Part 1: host variable
-						# For output, initialisation data must come from PREAMBLE.
-						if int(v.attrib["nmemb"]) > 1:
-							f.write(
-								'	{0} *{1} = malloc({2} * sizeof({0}));\n'.format(
-									v.attrib["type"], v.attrib["name"], v.attrib["nmemb"]
-								)
-							)
-						else:
-							f.write(
-								'	{} {};\n'.format(v.attrib["type"], v.attrib["name"])
-							)
-
-						# Part 2: validation variable
-						if ("novalidation" not in v.attrib) or (v.attrib["novalidation"] != "true"):
-							# Function is being used instead of explicit validation variable assignment
-							if v.text is None:
-								if int(v.attrib["nmemb"]) > 1:
-									f.write(
-										'	{} {}C[{}];\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"])
-									)
-								else:
-									f.write(
-										'	{} {}C;\n'.format(v.attrib["type"], v.attrib["name"])
-									)
-							# Explicit variable assignment
-							# XXX: Note that big variables may lead to stack overflow!
-							else:
-								if int(v.attrib["nmemb"]) > 1:
-									f.write(
-										(
-											'	{} {}C[{}] = {{\n'
-											'		{}\n'
-											'	}};\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"], v.text)
-										)
-									)
-								else:
-									f.write(
-										'	{} {}C = {};\n'.format(v.attrib["type"], v.attrib["name"], v.text)
-									)
-							# Epsilon variable (if supplied)
-							if "epsilon" in v.attrib:
-								f.write(
-									'	double {}Epsilon = {};\n'.format(v.attrib["name"], v.attrib["epsilon"])
-								)
-
-						# Part 3: device variable
-						f.write(
-							'	cl_mem {}K = NULL;\n'.format(v.attrib["name"])
-						)
 
 			# Call PREAMBLE function if "preamble" attribute is "yes"
 			if "preamble" in self._xmlRoot.attrib and "yes" == self._xmlRoot.attrib["preamble"]:
@@ -544,16 +549,21 @@ class CodeEmitter:
 	# Print clGetDevicesIDs section
 	def printGetDevicesIDs(self):
 		with open(self._targetFile, "a") as f:
+			platformID = '0'
+			for k in self._xmlRoot:
+				if "devinfo" == k.tag:
+					platformID = k.attrib["platform"]
+
 			f.write(
 				(
 					'	/* Get devices IDs for first platform availble */\n'
 					'	PRINT_STEP("Getting devices IDs for first platform...");\n'
-					'	fRet = clGetDeviceIDs(platforms[0], CL_DEVICE_TYPE_ACCELERATOR, 0, NULL, &devicesLen);\n'
+					'	fRet = clGetDeviceIDs(platforms[{0}], CL_DEVICE_TYPE_ALL, 0, NULL, &devicesLen);\n'
 					'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clGetDevicesIDs"));\n'
 					'	devices = malloc(devicesLen * sizeof(cl_device_id));\n'
-					'	fRet = clGetDeviceIDs(platforms[0], CL_DEVICE_TYPE_ACCELERATOR, devicesLen, devices, NULL);\n'
+					'	fRet = clGetDeviceIDs(platforms[{0}], CL_DEVICE_TYPE_ALL, devicesLen, devices, NULL);\n'
 					'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clGetDevicesIDs"));\n'
-					'	PRINT_SUCCESS();\n'
+					'	PRINT_SUCCESS();\n'.format(platformID)
 				)
 			)
 
@@ -575,16 +585,22 @@ class CodeEmitter:
 	# Print clCreateCommandQueues section
 	def printCreateCommandQueues(self):
 		with open(self._targetFile, "a") as f:
+			deviceID = '0'
 			for k in self._xmlRoot:
-				f.write(
-					(
-						'	/* Create command queue for {0} kernel */\n'
-						'	PRINT_STEP("Creating command queue for \\"{0}\\"...");\n'
-						'	queue{1} = clCreateCommandQueue(context, devices[0], 0, &fRet);\n'
-						'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateCommandQueue"));\n'
-						'	PRINT_SUCCESS();\n'.format(k.attrib["name"], k.attrib["name"].title())
+				if "devinfo" == k.tag:
+					deviceID = k.attrib["device"]
+
+			for k in self._xmlRoot:
+				if "kernel" == k.tag:
+					f.write(
+						(
+							'	/* Create command queue for {0} kernel */\n'
+							'	PRINT_STEP("Creating command queue for \\"{0}\\"...");\n'
+							'	queue{1} = clCreateCommandQueue(context, devices[{2}], 0, &fRet);\n'
+							'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateCommandQueue"));\n'
+							'	PRINT_SUCCESS();\n'.format(k.attrib["name"], k.attrib["name"].title(), deviceID)
+						)
 					)
-				)
 
 
 	# Print clCreateProgramWithBinary and clBuildProgram section
@@ -629,15 +645,16 @@ class CodeEmitter:
 	def printCreateKernels(self):
 		with open(self._targetFile, "a") as f:
 			for k in self._xmlRoot:
-				f.write(
-					(
-						'	/* Create {0} kernel */\n'
-						'	PRINT_STEP("Creating kernel \\"{0}\\" from program...");\n'
-						'	kernel{1} = clCreateKernel(program, "{0}", &fRet);\n'
-						'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateKernel"));\n'
-						'	PRINT_SUCCESS();\n'.format(k.attrib["name"], k.attrib["name"].title())
+				if "kernel" == k.tag:
+					f.write(
+						(
+							'	/* Create {0} kernel */\n'
+							'	PRINT_STEP("Creating kernel \\"{0}\\" from program...");\n'
+							'	kernel{1} = clCreateKernel(program, "{0}", &fRet);\n'
+							'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateKernel"));\n'
+							'	PRINT_SUCCESS();\n'.format(k.attrib["name"], k.attrib["name"].title())
+						)
 					)
-				)
 
 
 	# Print clCreateBuffer for all buffered variables
@@ -651,29 +668,30 @@ class CodeEmitter:
 			)
 
 			for k in self._xmlRoot:
-				for v in k:
-					if "input" == v.tag and int(v.attrib["nmemb"]) > 1:
-						f.write(
-							(
-								'	{0}K = clCreateBuffer(context, CL_MEM_READ_ONLY, {1} * sizeof({2}), NULL, &fRet);\n'
-								'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateBuffer ({0}K)"));\n'.format(
-									v.attrib["name"],
-									v.attrib["nmemb"],
-									v.attrib["type"]
+				if "kernel" == k.tag:
+					for v in k:
+						if "input" == v.tag and int(v.attrib["nmemb"]) > 1:
+							f.write(
+								(
+									'	{0}K = clCreateBuffer(context, CL_MEM_READ_ONLY, {1} * sizeof({2}), NULL, &fRet);\n'
+									'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateBuffer ({0}K)"));\n'.format(
+										v.attrib["name"],
+										v.attrib["nmemb"],
+										v.attrib["type"]
+									)
 								)
 							)
-						)
-					elif "output" == v.tag:
-						f.write(
-							(
-								'	{0}K = clCreateBuffer(context, CL_MEM_READ_WRITE, {1} * sizeof({2}), NULL, &fRet);\n'
-								'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateBuffer ({0}K)"));\n'.format(
-									v.attrib["name"],
-									v.attrib["nmemb"],
-									v.attrib["type"]
+						elif "output" == v.tag:
+							f.write(
+								(
+									'	{0}K = clCreateBuffer(context, CL_MEM_READ_WRITE, {1} * sizeof({2}), NULL, &fRet);\n'
+									'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clCreateBuffer ({0}K)"));\n'.format(
+										v.attrib["name"],
+										v.attrib["nmemb"],
+										v.attrib["type"]
+									)
 								)
 							)
-						)
 
 			f.write(
 				'	PRINT_SUCCESS();\n'
@@ -684,44 +702,45 @@ class CodeEmitter:
 	def printSetKernelsArgs(self):
 		with open(self._targetFile, "a") as f:
 			for k in self._xmlRoot:
-				f.write(
-					(
-						'	/* Set kernel arguments for {0} */\n'
-						'	PRINT_STEP("Setting kernel arguments for \\"{0}\\"...");\n'.format(k.attrib["name"])
+				if "kernel" == k.tag:
+					f.write(
+						(
+							'	/* Set kernel arguments for {0} */\n'
+							'	PRINT_STEP("Setting kernel arguments for \\"{0}\\"...");\n'.format(k.attrib["name"])
+						)
 					)
-				)
-
-				for v in k:
-					# If it is an input variable and its size is 1, send the variable explicitely
-					if "input" == v.tag and 1 == int(v.attrib["nmemb"]):
-						f.write(
-							(
-								'	fRet = clSetKernelArg(kernel{0}, {1}, sizeof({2}), &{3});\n'
-								'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clSetKernelArg ({3})"));\n'.format(
-									k.attrib["name"].title(), v.attrib["arg"], v.attrib["type"], v.attrib["name"]
+	
+					for v in k:
+						# If it is an input variable and its size is 1, send the variable explicitely
+						if "input" == v.tag and 1 == int(v.attrib["nmemb"]):
+							f.write(
+								(
+									'	fRet = clSetKernelArg(kernel{0}, {1}, sizeof({2}), &{3});\n'
+									'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clSetKernelArg ({3})"));\n'.format(
+										k.attrib["name"].title(), v.attrib["arg"], v.attrib["type"], v.attrib["name"]
+									)
 								)
 							)
-						)
-					elif "input" == v.tag or "output" == v.tag:
-						f.write(
-							(
-								'	fRet = clSetKernelArg(kernel{0}, {1}, sizeof(cl_mem), &{2}K);\n'
-								'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clSetKernelArg ({2}K)"));\n'.format(k.attrib["name"].title(), v.attrib["arg"], v.attrib["name"])
-							)
-						)
-					# Arguments with __local keyword
-					elif "local" == v.tag:
-						f.write(
-							(
-								'	fRet = clSetKernelArg(kernel{0}, {1}, {2} * sizeof({3}), NULL);\n'
-								'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clSetKernelArg (__local {1})"));\n'.format(
-									k.attrib["name"].title(),
-									v.attrib["arg"],
-									v.attrib["nmemb"],
-									v.attrib["type"]
+						elif "input" == v.tag or "output" == v.tag:
+							f.write(
+								(
+									'	fRet = clSetKernelArg(kernel{0}, {1}, sizeof(cl_mem), &{2}K);\n'
+									'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clSetKernelArg ({2}K)"));\n'.format(k.attrib["name"].title(), v.attrib["arg"], v.attrib["name"])
 								)
 							)
-						)
+						# Arguments with __local keyword
+						elif "local" == v.tag:
+							f.write(
+								(
+									'	fRet = clSetKernelArg(kernel{0}, {1}, {2} * sizeof({3}), NULL);\n'
+									'	ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clSetKernelArg (__local {1})"));\n'.format(
+										k.attrib["name"].title(),
+										v.attrib["arg"],
+										v.attrib["nmemb"],
+										v.attrib["type"]
+									)
+								)
+							)
 
 				f.write(
 					'	PRINT_SUCCESS();\n'
@@ -766,54 +785,55 @@ class CodeEmitter:
 
 			# For each kernel, set the input/output data
 			for k in self._xmlRoot:
-				for v in k:
-					# clEnqueueWriteBuffer for arrays, clSetKernelArg for single input
-					if "input" == v.tag:
-						if int(v.attrib["nmemb"]) > 1:
-							f.write(
-								(
-									'		fRet = clEnqueueWriteBuffer(queue{0}, {1}K, CL_TRUE, 0, {2} * sizeof({3}), {1}, 0, NULL, NULL);\n'
-									'		ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clEnqueueWriteBuffer ({1}K)"));\n'.format(
-										k.attrib["name"].title(),
-										v.attrib["name"],
-										v.attrib["nmemb"],
-										v.attrib["type"]
+				if "kernel" == k.tag:
+					for v in k:
+						# clEnqueueWriteBuffer for arrays, clSetKernelArg for single input
+						if "input" == v.tag:
+							if int(v.attrib["nmemb"]) > 1:
+								f.write(
+									(
+										'		fRet = clEnqueueWriteBuffer(queue{0}, {1}K, CL_TRUE, 0, {2} * sizeof({3}), {1}, 0, NULL, NULL);\n'
+										'		ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clEnqueueWriteBuffer ({1}K)"));\n'.format(
+											k.attrib["name"].title(),
+											v.attrib["name"],
+											v.attrib["nmemb"],
+											v.attrib["type"]
+										)
 									)
 								)
-							)
-						else:
-							f.write(
-								(
-									'		fRet = clSetKernelArg(kernel{0}, {1}, sizeof({2}), &{3});\n'
-									'		ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clSetKernelArg ({3})"));\n'.format(
-										k.attrib["name"].title(), v.attrib["arg"], v.attrib["type"], v.attrib["name"]
+							else:
+								f.write(
+									(
+										'		fRet = clSetKernelArg(kernel{0}, {1}, sizeof({2}), &{3});\n'
+										'		ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clSetKernelArg ({3})"));\n'.format(
+											k.attrib["name"].title(), v.attrib["arg"], v.attrib["type"], v.attrib["name"]
+										)
 									)
 								)
-							)
-					elif "output" == v.tag:
-						if int(v.attrib["nmemb"]) > 1:
-							f.write(
-								(
-									'		fRet = clEnqueueWriteBuffer(queue{0}, {1}K, CL_TRUE, 0, {2} * sizeof({3}), {1}, 0, NULL, NULL);\n'
-									'		ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clEnqueueWriteBuffer ({1}K)"));\n'.format(
-										k.attrib["name"].title(),
-										v.attrib["name"],
-										v.attrib["nmemb"],
-										v.attrib["type"]
+						elif "output" == v.tag:
+							if int(v.attrib["nmemb"]) > 1:
+								f.write(
+									(
+										'		fRet = clEnqueueWriteBuffer(queue{0}, {1}K, CL_TRUE, 0, {2} * sizeof({3}), {1}, 0, NULL, NULL);\n'
+										'		ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clEnqueueWriteBuffer ({1}K)"));\n'.format(
+											k.attrib["name"].title(),
+											v.attrib["name"],
+											v.attrib["nmemb"],
+											v.attrib["type"]
+										)
 									)
 								)
-							)
-						else:
-							f.write(
-								(
-									'		fRet = clEnqueueWriteBuffer(queue{0}, {1}K, CL_TRUE, 0, sizeof({2}), &{1}, 0, NULL, NULL);\n'
-									'		ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clEnqueueWriteBuffer ({1}K)"));\n'.format(
-										k.attrib["name"].title(),
-										v.attrib["name"],
-										v.attrib["type"]
+							else:
+								f.write(
+									(
+										'		fRet = clEnqueueWriteBuffer(queue{0}, {1}K, CL_TRUE, 0, sizeof({2}), &{1}, 0, NULL, NULL);\n'
+										'		ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clEnqueueWriteBuffer ({1}K)"));\n'.format(
+											k.attrib["name"].title(),
+											v.attrib["name"],
+											v.attrib["type"]
+										)
 									)
 								)
-							)
 
 			f.write(
 				'		PRINT_SUCCESS();\n'
@@ -830,24 +850,26 @@ class CodeEmitter:
 
 			# If order attribute is found in at least one kernel, we assume that all kernels has order attributes
 			for k in self._xmlRoot:
-				if "order" in k.attrib:
-					hasOrder = True
+				if "kernel" == k.tag:
+					if "order" in k.attrib:
+						hasOrder = True
 
 			# Kernels has ordering
 			if hasOrder:
 				# For every kernel
 				for k in self._xmlRoot:
-					order = int(k.attrib["order"])
-
-					# First time this order number is being used
-					if order not in orderedIndexes:
-						# Append order number to order list
-						orderedIndexes.append(order)
-						# Create an array in the dictionary
-						kernels[order] = []
-
-					# Append kernel number to the order in the dictionary
-					kernels[order].append(k)
+					if "kernel" == k.tag:
+						order = int(k.attrib["order"])
+	
+						# First time this order number is being used
+						if order not in orderedIndexes:
+							# Append order number to order list
+							orderedIndexes.append(order)
+							# Create an array in the dictionary
+							kernels[order] = []
+	
+						# Append kernel number to the order in the dictionary
+						kernels[order].append(k)
 
 				# Sort order list
 				orderedIndexes = sorted(orderedIndexes)
@@ -913,23 +935,24 @@ class CodeEmitter:
 					)
 
 				for k in self._xmlRoot:
-					dim = "1"
-					localSize = "NULL"
-					for v in k:
-						if "ndrange" == v.tag:
-							for d in v:
-								if "local" == d.tag:
-									localSize = "localSize{}".format(k.attrib["name"].title())
-
-					f.write(
-						(
-							'		fRet = clEnqueueNDRangeKernel(queue{0}, kernel{0}, workDim{0}, NULL, globalSize{0}, {1}, 0, NULL, NULL);\n'
-							'		ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clEnqueueNDRangeKernel"));\n'.format(
-								k.attrib["name"].title(),
-								localSize
+					if "kernel" == k.tag:
+						dim = "1"
+						localSize = "NULL"
+						for v in k:
+							if "ndrange" == v.tag:
+								for d in v:
+									if "local" == d.tag:
+										localSize = "localSize{}".format(k.attrib["name"].title())
+	
+						f.write(
+							(
+								'		fRet = clEnqueueNDRangeKernel(queue{0}, kernel{0}, workDim{0}, NULL, globalSize{0}, {1}, 0, NULL, NULL);\n'
+								'		ASSERT_CALL(CL_SUCCESS == fRet, FUNCTION_ERROR_STATEMENTS("clEnqueueNDRangeKernel"));\n'.format(
+									k.attrib["name"].title(),
+									localSize
+								)
 							)
 						)
-					)
 
 				# If profiling is on, get "now"
 				if profile:
@@ -953,17 +976,18 @@ class CodeEmitter:
 			)
 
 			for k in self._xmlRoot:
-				for v in k:
-					if "output" == v.tag:
-						f.write(
-							'		fRet = clEnqueueReadBuffer(queue{0}, {1}K, CL_TRUE, 0, {2} * sizeof({3}), {4}{1}, 0, NULL, NULL);\n'.format(
-								k.attrib["name"].title(),
-								v.attrib["name"],
-								v.attrib["nmemb"],
-								v.attrib["type"],
-								"" if int(v.attrib["nmemb"]) > 1 else "&"
+				if "kernel" == k.tag:
+					for v in k:
+						if "output" == v.tag:
+							f.write(
+								'		fRet = clEnqueueReadBuffer(queue{0}, {1}K, CL_TRUE, 0, {2} * sizeof({3}), {4}{1}, 0, NULL, NULL);\n'.format(
+									k.attrib["name"].title(),
+									v.attrib["name"],
+									v.attrib["nmemb"],
+									v.attrib["type"],
+									"" if int(v.attrib["nmemb"]) > 1 else "&"
+								)
 							)
-						)
 
 			f.write(
 				(
@@ -1052,121 +1076,122 @@ class CodeEmitter:
 			)
 
 			for k in self._xmlRoot:
-				for v in k:
-					if ("output" == v.tag) and (("novalidation" not in v.attrib) or (v.attrib["novalidation"] != "true")):
-						# Variable is of vector type (e.g. cl_double2)
-						if v.attrib["type"] in self._vectorTypes:
-							vectorType = self._vectorTypes[v.attrib["type"]]
-							if int(v.attrib["nmemb"]) > 1:
-								if "epsilon" in v.attrib:
-									validationStr = 'TEST_EPSILON({0}C[i].s[j], {0}[i].s[j], {0}Epsilon)'.format(v.attrib["name"])
-									validationStr2 = ' (with epsilon)'
-								else: 
-									validationStr = '{0}C[i].s[j] != {0}[i].s[j]'.format(v.attrib["name"])
-									validationStr2 = ''
-
-								f.write(
-									(
-										'	for(i = 0; i < {0}; i++) {{\n'
-										'		for(j = 0; j < {1}; j++) {{\n'
-										'			if({2}) {{\n'
-										'				if(!invalidDataFound) {{\n'
-										'					PRINT_FAIL();\n'
-										'					invalidDataFound = true;\n'
-										'				}}\n'
-										'				printf("Variable {3}[%d].s[%d]: expected %{4} got %{4}{5}.\\n", i, j, {3}C[i].s[j], {3}[i].s[j]);\n'
-										'			}}\n'
-										'		}}\n'
-										'	}}\n'.format(
-											v.attrib["nmemb"],
-											vectorType[0],
-											validationStr,
-											v.attrib["name"],
-											self._printfMapper[vectorType[1]] if vectorType[1] in self._printfMapper else "x",
-											validationStr2
+				if "kernel" == k.tag:
+					for v in k:
+						if ("output" == v.tag) and (("novalidation" not in v.attrib) or (v.attrib["novalidation"] != "true")):
+							# Variable is of vector type (e.g. cl_double2)
+							if v.attrib["type"] in self._vectorTypes:
+								vectorType = self._vectorTypes[v.attrib["type"]]
+								if int(v.attrib["nmemb"]) > 1:
+									if "epsilon" in v.attrib:
+										validationStr = 'TEST_EPSILON({0}C[i].s[j], {0}[i].s[j], {0}Epsilon)'.format(v.attrib["name"])
+										validationStr2 = ' (with epsilon)'
+									else: 
+										validationStr = '{0}C[i].s[j] != {0}[i].s[j]'.format(v.attrib["name"])
+										validationStr2 = ''
+	
+									f.write(
+										(
+											'	for(i = 0; i < {0}; i++) {{\n'
+											'		for(j = 0; j < {1}; j++) {{\n'
+											'			if({2}) {{\n'
+											'				if(!invalidDataFound) {{\n'
+											'					PRINT_FAIL();\n'
+											'					invalidDataFound = true;\n'
+											'				}}\n'
+											'				printf("Variable {3}[%d].s[%d]: expected %{4} got %{4}{5}.\\n", i, j, {3}C[i].s[j], {3}[i].s[j]);\n'
+											'			}}\n'
+											'		}}\n'
+											'	}}\n'.format(
+												v.attrib["nmemb"],
+												vectorType[0],
+												validationStr,
+												v.attrib["name"],
+												self._printfMapper[vectorType[1]] if vectorType[1] in self._printfMapper else "x",
+												validationStr2
+											)
 										)
 									)
-								)
+								else:
+									if "epsilon" in v.attrib:
+										validationStr = 'TEST_EPSILON({0}C.s[i], {0}.s[i], {0}Epsilon)'.format(v.attrib["name"])
+										validationStr2 = ' (with epsilon)'
+									else: 
+										validationStr = '{0}C.s[i] != {0}.s[i]'.format(v.attrib["name"])
+										validationStr2 = ''
+	
+									f.write(
+										(
+											'	for(i = 0; i < {0}; i++) {{\n'
+											'		if({1}) {{\n'
+											'			if(!invalidDataFound) {{\n'
+											'				PRINT_FAIL();\n'
+											'				invalidDataFound = true;\n'
+											'			}}\n'
+											'			printf("Variable {2}.s[%d]: expected %{3} got %{3}{4}.\\n", i, {2}C.s[j], {2}.s[j]);\n'
+											'		}}\n'
+											'	}}\n'.format(
+												vectorType[0],
+												validationStr,
+												v.attrib["name"],
+												self._printfMapper[vectorType[1]] if vectorType[1] in self._printfMapper else "x",
+												validationStr2
+											)
+										)
+									)
+							# Not vector type variable
 							else:
-								if "epsilon" in v.attrib:
-									validationStr = 'TEST_EPSILON({0}C.s[i], {0}.s[i], {0}Epsilon)'.format(v.attrib["name"])
-									validationStr2 = ' (with epsilon)'
-								else: 
-									validationStr = '{0}C.s[i] != {0}.s[i]'.format(v.attrib["name"])
-									validationStr2 = ''
-
-								f.write(
-									(
-										'	for(i = 0; i < {0}; i++) {{\n'
-										'		if({1}) {{\n'
-										'			if(!invalidDataFound) {{\n'
-										'				PRINT_FAIL();\n'
-										'				invalidDataFound = true;\n'
-										'			}}\n'
-										'			printf("Variable {2}.s[%d]: expected %{3} got %{3}{4}.\\n", i, {2}C.s[j], {2}.s[j]);\n'
-										'		}}\n'
-										'	}}\n'.format(
-											vectorType[0],
-											validationStr,
-											v.attrib["name"],
-											self._printfMapper[vectorType[1]] if vectorType[1] in self._printfMapper else "x",
-											validationStr2
+								if int(v.attrib["nmemb"]) > 1:
+									if "epsilon" in v.attrib:
+										validationStr = 'TEST_EPSILON({0}C[i],  {0}[i], {0}Epsilon)'.format(v.attrib["name"])
+										validationStr2 = ' (with epsilon)'
+									else: 
+										validationStr = '{0}C[i] != {0}[i]'.format(v.attrib["name"])
+										validationStr2 = ''
+	
+									f.write(
+										(
+											'	for(i = 0; i < {0}; i++) {{\n'
+											'		if({1}) {{\n'
+											'			if(!invalidDataFound) {{\n'
+											'				PRINT_FAIL();\n'
+											'				invalidDataFound = true;\n'
+											'			}}\n'
+											'			printf("Variable {2}[%d]: expected %{3} got %{3}{4}.\\n", i, {2}C[i], {2}[i]);\n'
+											'		}}\n'
+											'	}}\n'.format(
+												v.attrib["nmemb"],
+												validationStr,
+												v.attrib["name"],
+												self._printfMapper[v.attrib["type"]] if v.attrib["type"] in self._printfMapper else "x",
+												validationStr2
+											)
 										)
 									)
-								)
-						# Not vector type variable
-						else:
-							if int(v.attrib["nmemb"]) > 1:
-								if "epsilon" in v.attrib:
-									validationStr = 'TEST_EPSILON({0}C[i],  {0}[i], {0}Epsilon)'.format(v.attrib["name"])
-									validationStr2 = ' (with epsilon)'
-								else: 
-									validationStr = '{0}C[i] != {0}[i]'.format(v.attrib["name"])
-									validationStr2 = ''
-
-								f.write(
-									(
-										'	for(i = 0; i < {0}; i++) {{\n'
-										'		if({1}) {{\n'
-										'			if(!invalidDataFound) {{\n'
-										'				PRINT_FAIL();\n'
-										'				invalidDataFound = true;\n'
-										'			}}\n'
-										'			printf("Variable {2}[%d]: expected %{3} got %{3}{4}.\\n", i, {2}C[i], {2}[i]);\n'
-										'		}}\n'
-										'	}}\n'.format(
-											v.attrib["nmemb"],
-											validationStr,
-											v.attrib["name"],
-											self._printfMapper[v.attrib["type"]] if v.attrib["type"] in self._printfMapper else "x",
-											validationStr2
+								else:
+									if "epsilon" in v.attrib:
+										validationStr = 'TEST_EPSILON({0}C, {0}, {0}Epsilon)'.format(v.attrib["name"])
+										validationStr2 = ' (with epsilon)'
+									else: 
+										validationStr = '{0}C != {0}'.format(v.attrib["name"])
+										validationStr2 = ''
+	
+									f.write(
+										(
+											'	if({0}) {{\n'
+											'		if(!invalidDataFound) {{\n'
+											'			PRINT_FAIL();\n'
+											'			invalidDataFound = true;\n'
+											'		}}\n'
+											'		printf("Variable {1}: expected %{2} got %{2}{3}.\\n", i, {1}C, {1});\n'
+											'	}}\n'.format(
+												validationStr,
+												v.attrib["name"],
+												self._printfMapper[v.attrib["type"]] if v.attrib["type"] in self._printfMapper else "x",
+												validationStr2
+											)
 										)
 									)
-								)
-							else:
-								if "epsilon" in v.attrib:
-									validationStr = 'TEST_EPSILON({0}C, {0}, {0}Epsilon)'.format(v.attrib["name"])
-									validationStr2 = ' (with epsilon)'
-								else: 
-									validationStr = '{0}C != {0}'.format(v.attrib["name"])
-									validationStr2 = ''
-
-								f.write(
-									(
-										'	if({0}) {{\n'
-										'		if(!invalidDataFound) {{\n'
-										'			PRINT_FAIL();\n'
-										'			invalidDataFound = true;\n'
-										'		}}\n'
-										'		printf("Variable {1}: expected %{2} got %{2}{3}.\\n", i, {1}C, {1});\n'
-										'	}}\n'.format(
-											validationStr,
-											v.attrib["name"],
-											self._printfMapper[v.attrib["type"]] if v.attrib["type"] in self._printfMapper else "x",
-											validationStr2
-										)
-									)
-								)
 
 			f.write(
 				(
@@ -1204,14 +1229,15 @@ class CodeEmitter:
 			)
 
 			for k in self._xmlRoot:
-				for v in k:
-					if ("input" == v.tag or "output" == v.tag) and int(v.attrib["nmemb"]) > 1:
-						f.write(
-							(
-								'	if({0}K)\n'
-								'		clReleaseMemObject({0}K);\n'.format(v.attrib["name"])
+				if "kernel" == k.tag:
+					for v in k:
+						if ("input" == v.tag or "output" == v.tag) and int(v.attrib["nmemb"]) > 1:
+							f.write(
+								(
+									'	if({0}K)\n'
+									'		clReleaseMemObject({0}K);\n'.format(v.attrib["name"])
+								)
 							)
-						)
 
 
 	# Print variable deallocs section
@@ -1223,18 +1249,19 @@ class CodeEmitter:
 
 			# Iterate through every variable of every kernel
 			for k in self._xmlRoot:
-				for v in k:
-					if "input" == v.tag:
-						if v.text is None:
+				if "kernel" == k.tag:
+					for v in k:
+						if "input" == v.tag:
+							if v.text is None:
+								if int(v.attrib["nmemb"]) > 1:
+									f.write(
+										'	free({});\n'.format(v.attrib["name"])
+									)
+						elif "output" == v.tag:
 							if int(v.attrib["nmemb"]) > 1:
 								f.write(
 									'	free({});\n'.format(v.attrib["name"])
 								)
-					elif "output" == v.tag:
-						if int(v.attrib["nmemb"]) > 1:
-							f.write(
-								'	free({});\n'.format(v.attrib["name"])
-							)
 
 
 	# Print clReleaseKernel section
@@ -1245,12 +1272,13 @@ class CodeEmitter:
 			)
 
 			for k in self._xmlRoot:
-				f.write(
-					(
-						'	if(kernel{0})\n'
-						'		clReleaseKernel(kernel{0});\n'.format(k.attrib["name"].title())
+				if "kernel" == k.tag:
+					f.write(
+						(
+							'	if(kernel{0})\n'
+							'		clReleaseKernel(kernel{0});\n'.format(k.attrib["name"].title())
+						)
 					)
-				)
 
 
 	# Print clReleaseProgram section
@@ -1277,12 +1305,13 @@ class CodeEmitter:
 			)
 
 			for k in self._xmlRoot:
-				f.write(
-					(
-						'	if(queue{0})\n'
-						'		clReleaseCommandQueue(queue{0});\n'.format(k.attrib["name"].title())
+				if "kernel" == k.tag:
+					f.write(
+						(
+							'	if(queue{0})\n'
+							'		clReleaseCommandQueue(queue{0});\n'.format(k.attrib["name"].title())
+						)
 					)
-				)
 
 
 	# Print last OpenCL deallocs

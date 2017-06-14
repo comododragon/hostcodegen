@@ -34,6 +34,14 @@
 -->
 <kernels program="program.aocx" profile="yes" preamble="yes" postamble="yes" looppreamble="yes" looppostamble="yes" cleanup="yes">
 	<!--
+		This is platform-device description node. If omitted, device[0] from platform[0] will be used. The following
+		attributes are possible:
+			platform: platform number;
+			device: device number.
+	-->
+	<devinfo platform="0" device="0" />
+
+	<!--
 		This is a kernel node. One or more may be provided. The following attributes are possible:
 			name: name of kernel function;
 			order: (optional) defines the order of execution between kernels. Lower means "run before".

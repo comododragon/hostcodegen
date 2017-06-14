@@ -44,20 +44,25 @@ All kernels to be executed by the host must be described on an XML file. An exam
 
 ```
 <?xml version="1.0" encoding="utf-8"?>
-<kernels program="program.aocx" preamble="yes" postamble="yes" looppreamble="yes" looppostamble="yes" cleanup="yes">
+<kernels program="program.aocx" profile="yes" preamble="yes" postamble="yes" looppreamble="yes" looppostamble="yes" cleanup="yes">
+	<devinfo platform="0" device="0" />
 	<kernel name="add" order="1">
 		<ndrange dim="1">
 			<global>10</global>
 		</ndrange>
 		<input name="a" type="float" nmemb="10" arg="0">9, 8, 7, 6, 5, 4, 3, 2, 1, 0</input>
 		<input name="b" type="float" nmemb="10" arg="1" />
-		<output name="c" type="float" nmemb="10" arg="2">27, 25, 23, 21, 19, 17, 15, 13, 11, 9</output>
+		<output name="c" type="float" nmemb="10" arg="2" epsilon="0.5">27.3, 24.7, 23, 21, 19, 17, 15.1, 13, 11, 9</output>
 		<output name="d" type="float" nmemb="10" arg="3" />
 	</kernel>
 </kernels>
 ```
 
 Descriptions for each tag and attributes are available on the xml files.
+
+### Platform and device select
+
+If ```devinfo``` tag is omitted from the xml, first device from first platform will be used. To list available platforms and devices on your system, one may use: https://gist.github.com/courtneyfaulkner/7919509
 
 ### Generating host code
 
