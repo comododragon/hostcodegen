@@ -1170,7 +1170,7 @@ class CodeEmitter:
 											'				PRINT_FAIL();\n'
 											'				invalidDataFound = true;\n'
 											'			}}\n'
-											'			printf("Variable {2}.s[%d]: expected %{3} got %{3}{4}.\\n", i, {2}C.s[j], {2}.s[j]);\n'
+											'			printf("Variable {2}.s[%d]: expected %{3} got %{3}{4}.\\n", i, {2}C.s[i], {2}.s[i]);\n'
 											'		}}\n'
 											'	}}\n'.format(
 												vectorType[0],
@@ -1225,7 +1225,7 @@ class CodeEmitter:
 											'			PRINT_FAIL();\n'
 											'			invalidDataFound = true;\n'
 											'		}}\n'
-											'		printf("Variable {1}: expected %{2} got %{2}{3}.\\n", i, {1}C, {1});\n'
+											'		printf("Variable {1}: expected %{2} got %{2}{3}.\\n", {1}C, {1});\n'
 											'	}}\n'.format(
 												validationStr,
 												v.attrib["name"],
