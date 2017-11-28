@@ -350,8 +350,8 @@ class CodeEmitter:
 			if "profile" in self._xmlRoot.attrib and "yes" == self._xmlRoot.attrib["profile"]:
 				f.write(
 					(
-						'	struct timeval then, now;\n'
-						'	long execTime = 0;\n'
+						'	struct timeval tThen, tNow, tDelta, tExecTime;\n'
+						'	timerclear(&tExecTime);\n'
 					)
 				)
 
@@ -467,7 +467,9 @@ class CodeEmitter:
 								if v.text is None:
 									if int(v.attrib["nmemb"]) > 1:
 										f.write(
-											'	{} {}C[{}];\n'.format(v.attrib["type"], v.attrib["name"], v.attrib["nmemb"])
+											'	{0} *{1}C = malloc({2} * sizeof({0}));\n'.format(
+												v.attrib["type"], v.attrib["name"], v.attrib["nmemb"]
+											)
 										)
 									else:
 										f.write(
@@ -909,7 +911,7 @@ class CodeEmitter:
 				# If profiling is on, get "then"
 				if profile:
 					f.write(
-						'		gettimeofday(&then, NULL);\n'
+						'		gettimeofday(&tThen, NULL);\n'
 					)
 
 				# Iterate through all orders
@@ -937,13 +939,15 @@ class CodeEmitter:
 							)
 						)
 
+				# Finish kernels
+				f.write(
+					'		clFinish(queue{});\n'.format(k.attrib["name"].title())
+				)
+
 				# If profiling is on, get "now"
 				if profile:
 					f.write(
-						(
-							'		clFinish(queue{});\n'
-							'		gettimeofday(&now, NULL);\n'.format(k.attrib["name"].title())
-						)
+						'		gettimeofday(&tNow, NULL);\n'
 					)
 
 				f.write(
@@ -955,10 +959,10 @@ class CodeEmitter:
 					'		PRINT_STEP("[%d] Running kernels...", i);\n'
 				)
 
-				# If profiling is on, get "then"
+				# If profiling is on, get "tThen"
 				if profile:
 					f.write(
-						'		gettimeofday(&then, NULL);\n'
+						'		gettimeofday(&tThen, NULL);\n'
 					)
 
 				for k in self._xmlRoot:
@@ -981,13 +985,15 @@ class CodeEmitter:
 							)
 						)
 
+				# Finish kernels
+				f.write(
+					'		clFinish(queue{});\n'.format(k.attrib["name"].title())
+				)
+
 				# If profiling is on, get "now"
 				if profile:
 					f.write(
-						(
-							'		clFinish(queue{});\n'
-							'		gettimeofday(&now, NULL);\n'.format(k.attrib["name"].title())
-						)
+						'		gettimeofday(&tNow, NULL);\n'
 					)
 
 				f.write(
@@ -1054,7 +1060,8 @@ class CodeEmitter:
 
 			if "profile" in self._xmlRoot.attrib and "yes" == self._xmlRoot.attrib["profile"]:
 				f.write(
-					'		execTime += now.tv_usec - then.tv_usec;\n'
+					'		timersub(&tNow, &tThen, &tDelta);\n'
+					'		timeradd(&tExecTime, &tDelta, &tExecTime);\n'
 				)
 
 			f.write(
@@ -1102,7 +1109,8 @@ class CodeEmitter:
 				f.write(
 					(
 						'	/* Print profiling results */\n'
-						'	printf("Elapsed time spent on kernels: %ld us; Average time per iteration: %ld us.\\n", execTime, execTime / i);\n'
+						'	long totalTime = (1000000 * tExecTime.tv_sec) + tExecTime.tv_usec;\n'
+						'	printf("Elapsed time spent on kernels: %ld us; Average time per iteration: %lf us.\\n", totalTime, totalTime / (double) i);\n'
 					)
 				)
 
@@ -1291,6 +1299,10 @@ class CodeEmitter:
 							if int(v.attrib["nmemb"]) > 1:
 								f.write(
 									'	free({});\n'.format(v.attrib["name"])
+								)
+							if ("novalidation" not in v.attrib) or (v.attrib["novalidation"] != "true"):
+								f.write(
+									'	free({}C);\n'.format(v.attrib["name"])
 								)
 
 
