@@ -66,6 +66,8 @@
 				type: C-compatible type of variable (vector types of OpenCL, like cl_double2 are supported);
 				nmemb: number of members. If nmemb = 1, variable will be directly passed to the
 					kernel without the use of cl_mem buffers;
+				forcepointer: (optional) if nmemb is 1, by default the variable is passed without buffer to kernel. If
+					you want to get the result from this variable back, forcepointer should be "true";
 				arg: argument position for kernel. This is the arg_index value of clSetKernelArg;
 		-->
 		<input name="a" type="float" nmemb="10" arg="0">9, 8, 7, 6, 5, 4, 3, 2, 1, 0</input>
@@ -79,6 +81,8 @@
 				arg: argument position for kernel. This is the arg_index value of clSetKernelArg;
 				novalidation: (optional) if "true", validation variable ("<varname>C") will not be generated.
 				epsilon: (optional) specify an error range for validation. If omitted, output data must be equal to validation data.
+				forcepointer: (optional) if nmemb is 1, by default the variable is passed without buffer to kernel. If
+					you want to get the result from this variable back, forcepointer should be "true";
 		-->
 		<output name="c" type="float" nmemb="10" arg="2" epsilon="0.5">27.3, 24.7, 23, 21, 19, 17, 15.1, 13, 11, 9</output>
 		<output name="d" type="float" nmemb="10" arg="3" />

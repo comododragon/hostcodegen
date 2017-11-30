@@ -182,14 +182,16 @@ class CodeEmitter:
 			for k in self._xmlRoot:
 				if "kernel" == k.tag:
 					for v in k:
+						forcePointer = ("forcepointer" in v.attrib) and (v.attrib["forcepointer"] == "true")
+
 						if ("input" == v.tag) or ("output" == v.tag):
-							self._varTypeList.append("{}{}".format(v.attrib["type"], " *" if int(v.attrib["nmemb"]) > 1 else ""))
+							self._varTypeList.append("{}{}".format(v.attrib["type"], " *" if (int(v.attrib["nmemb"]) > 1) or forcePointer else ""))
 							self._varNameList.append(v.attrib["name"])
 							self._varTypeList.append("unsigned int")
 							self._varNameList.append(v.attrib["nmemb"])
 	
 						if ("output" == v.tag) and (("novalidation" not in v.attrib) or (v.attrib["novalidation"] != "true")):
-							self._varTypeList.append("{}{}".format(v.attrib["type"], " *" if int(v.attrib["nmemb"]) > 1 else ""))
+							self._varTypeList.append("{}{}".format(v.attrib["type"], " *" if (int(v.attrib["nmemb"])  > 1) or forcePointer else ""))
 							self._varNameList.append("{}C".format(v.attrib["name"]))
 							self._varTypeList.append("unsigned int")
 							self._varNameList.append(v.attrib["nmemb"])
@@ -412,11 +414,13 @@ class CodeEmitter:
 			for k in self._xmlRoot:
 				if "kernel" == k.tag:
 					for v in k:
+						forcePointer = ("forcepointer" in v.attrib) and (v.attrib["forcepointer"] == "true")
+
 						if "input" == v.tag:
 							# Part 1: host variable
 							# Function is being used instead of explicit variable initialisation
 							if v.text is None:
-								if int(v.attrib["nmemb"]) > 1:
+								if (int(v.attrib["nmemb"]) > 1) or forcePointer:
 									f.write(
 										'	{0} *{1} = malloc({2} * sizeof({0}));\n'.format(
 											v.attrib["type"], v.attrib["name"], v.attrib["nmemb"]
@@ -429,7 +433,7 @@ class CodeEmitter:
 							# Explicit variable initialisation
 							# XXX: Note that big variables may lead to stack overflow!
 							else:
-								if int(v.attrib["nmemb"]) > 1:
+								if (int(v.attrib["nmemb"]) > 1) or forcePointer:
 									f.write(
 										(
 											'	{} {}[{}] = {{\n'
@@ -443,14 +447,14 @@ class CodeEmitter:
 									)
 	
 							# Part 2: device variable
-							if int(v.attrib["nmemb"]) > 1:
+							if (int(v.attrib["nmemb"]) > 1) or forcePointer:
 								f.write(
 									'	cl_mem {}K = NULL;\n'.format(v.attrib["name"])
 								)
 						elif "output" == v.tag:
 							# Part 1: host variable
 							# For output, initialisation data must come from PREAMBLE.
-							if int(v.attrib["nmemb"]) > 1:
+							if (int(v.attrib["nmemb"]) > 1) or forcePointer:
 								f.write(
 									'	{0} *{1} = malloc({2} * sizeof({0}));\n'.format(
 										v.attrib["type"], v.attrib["name"], v.attrib["nmemb"]
@@ -465,7 +469,7 @@ class CodeEmitter:
 							if ("novalidation" not in v.attrib) or (v.attrib["novalidation"] != "true"):
 								# Function is being used instead of explicit validation variable assignment
 								if v.text is None:
-									if int(v.attrib["nmemb"]) > 1:
+									if (int(v.attrib["nmemb"]) > 1) or forcePointer:
 										f.write(
 											'	{0} *{1}C = malloc({2} * sizeof({0}));\n'.format(
 												v.attrib["type"], v.attrib["name"], v.attrib["nmemb"]
@@ -478,7 +482,7 @@ class CodeEmitter:
 								# Explicit variable assignment
 								# XXX: Note that big variables may lead to stack overflow!
 								else:
-									if int(v.attrib["nmemb"]) > 1:
+									if (int(v.attrib["nmemb"]) > 1) or forcePointer:
 										f.write(
 											(
 												'	{} {}C[{}] = {{\n'
@@ -696,7 +700,9 @@ class CodeEmitter:
 			for k in self._xmlRoot:
 				if "kernel" == k.tag:
 					for v in k:
-						if "input" == v.tag and int(v.attrib["nmemb"]) > 1:
+						forcePointer = ("forcepointer" in v.attrib) and (v.attrib["forcepointer"] == "true")
+
+						if "input" == v.tag and ((int(v.attrib["nmemb"]) > 1) or forcePointer):
 							f.write(
 								(
 									'	{0}K = clCreateBuffer(context, CL_MEM_READ_ONLY, {1} * sizeof({2}), NULL, &fRet);\n'
@@ -737,8 +743,10 @@ class CodeEmitter:
 					)
 	
 					for v in k:
+						forcePointer = ("forcepointer" in v.attrib) and (v.attrib["forcepointer"] == "true")
+
 						# If it is an input variable and its size is 1, send the variable explicitely
-						if "input" == v.tag and 1 == int(v.attrib["nmemb"]):
+						if "input" == v.tag and 1 == int(v.attrib["nmemb"]) and not forcePointer:
 							f.write(
 								(
 									'	fRet = clSetKernelArg(kernel{0}, {1}, sizeof({2}), &{3});\n'
@@ -813,9 +821,11 @@ class CodeEmitter:
 			for k in self._xmlRoot:
 				if "kernel" == k.tag:
 					for v in k:
+						forcePointer = ("forcepointer" in v.attrib) and (v.attrib["forcepointer"] == "true")
+
 						# clEnqueueWriteBuffer for arrays, clSetKernelArg for single input
 						if "input" == v.tag:
-							if int(v.attrib["nmemb"]) > 1:
+							if (int(v.attrib["nmemb"]) > 1) or forcePointer:
 								f.write(
 									(
 										'		fRet = clEnqueueWriteBuffer(queue{0}, {1}K, CL_TRUE, 0, {2} * sizeof({3}), {1}, 0, NULL, NULL);\n'
@@ -837,7 +847,7 @@ class CodeEmitter:
 									)
 								)
 						elif "output" == v.tag:
-							if int(v.attrib["nmemb"]) > 1:
+							if (int(v.attrib["nmemb"]) > 1) or forcePointer:
 								f.write(
 									(
 										'		fRet = clEnqueueWriteBuffer(queue{0}, {1}K, CL_TRUE, 0, {2} * sizeof({3}), {1}, 0, NULL, NULL);\n'
@@ -1014,6 +1024,8 @@ class CodeEmitter:
 			for k in self._xmlRoot:
 				if "kernel" == k.tag:
 					for v in k:
+						forcePointer = ("forcepointer" in v.attrib) and (v.attrib["forcepointer"] == "true")
+
 						if "output" == v.tag:
 							f.write(
 								'		fRet = clEnqueueReadBuffer(queue{0}, {1}K, CL_TRUE, 0, {2} * sizeof({3}), {4}{1}, 0, NULL, NULL);\n'.format(
@@ -1021,7 +1033,7 @@ class CodeEmitter:
 									v.attrib["name"],
 									v.attrib["nmemb"],
 									v.attrib["type"],
-									"" if int(v.attrib["nmemb"]) > 1 else "&"
+									"" if (int(v.attrib["nmemb"]) > 1) or forcePointer else "&"
 								)
 							)
 
@@ -1128,11 +1140,13 @@ class CodeEmitter:
 			for k in self._xmlRoot:
 				if "kernel" == k.tag:
 					for v in k:
+						forcePointer = ("forcepointer" in v.attrib) and (v.attrib["forcepointer"] == "true")
+
 						if ("output" == v.tag) and (("novalidation" not in v.attrib) or (v.attrib["novalidation"] != "true")):
 							# Variable is of vector type (e.g. cl_double2)
 							if v.attrib["type"] in self._vectorTypes:
 								vectorType = self._vectorTypes[v.attrib["type"]]
-								if int(v.attrib["nmemb"]) > 1:
+								if (int(v.attrib["nmemb"]) > 1) or forcePointer:
 									if "epsilon" in v.attrib:
 										validationStr = 'TEST_EPSILON({0}C[i].s[j], {0}[i].s[j], {0}Epsilon)'.format(v.attrib["name"])
 										validationStr2 = ' (with epsilon)'
@@ -1191,7 +1205,7 @@ class CodeEmitter:
 									)
 							# Not vector type variable
 							else:
-								if int(v.attrib["nmemb"]) > 1:
+								if (int(v.attrib["nmemb"]) > 1) or forcePointer:
 									if "epsilon" in v.attrib:
 										validationStr = 'TEST_EPSILON({0}C[i],  {0}[i], {0}Epsilon)'.format(v.attrib["name"])
 										validationStr2 = ' (with epsilon)'
@@ -1269,7 +1283,9 @@ class CodeEmitter:
 			for k in self._xmlRoot:
 				if "kernel" == k.tag:
 					for v in k:
-						if ("input" == v.tag or "output" == v.tag) and int(v.attrib["nmemb"]) > 1:
+						forcePointer = ("forcepointer" in v.attrib) and (v.attrib["forcepointer"] == "true")
+
+						if ("input" == v.tag or "output" == v.tag) and ((int(v.attrib["nmemb"]) > 1) or forcePointer):
 							f.write(
 								(
 									'	if({0}K)\n'
@@ -1289,14 +1305,16 @@ class CodeEmitter:
 			for k in self._xmlRoot:
 				if "kernel" == k.tag:
 					for v in k:
+						forcePointer = ("forcepointer" in v.attrib) and (v.attrib["forcepointer"] == "true")
+
 						if "input" == v.tag:
 							if v.text is None:
-								if int(v.attrib["nmemb"]) > 1:
+								if (int(v.attrib["nmemb"]) > 1) or forcePointer:
 									f.write(
 										'	free({});\n'.format(v.attrib["name"])
 									)
 						elif "output" == v.tag:
-							if int(v.attrib["nmemb"]) > 1:
+							if (int(v.attrib["nmemb"]) > 1) or forcePointer:
 								f.write(
 									'	free({});\n'.format(v.attrib["name"])
 								)
