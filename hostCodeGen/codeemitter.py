@@ -78,7 +78,7 @@ class CodeEmitter:
 		"cl_uint2": (2, "unsigned int"),
 		"cl_long2": (2, "long"),
 		"cl_ulong2": (2, "unsigned long"),
-		"cl_half2": (2, "float"),
+		"cl_half2": (2, "half"),
 		"cl_float2": (2, "float"),
 		"cl_double2": (2, "double"),
 		"cl_char3": (3, "char"),
@@ -89,7 +89,7 @@ class CodeEmitter:
 		"cl_uint3": (3, "unsigned int"),
 		"cl_long3": (3, "long"),
 		"cl_ulong3": (3, "unsigned long"),
-		"cl_half3": (3, "float"),
+		"cl_half3": (3, "half"),
 		"cl_float3": (3, "float"),
 		"cl_double3": (3, "double"),
 		"cl_char4": (4, "char"),
@@ -100,7 +100,7 @@ class CodeEmitter:
 		"cl_uint4": (4, "unsigned int"),
 		"cl_long4": (4, "long"),
 		"cl_ulong4": (4, "unsigned long"),
-		"cl_half4": (4, "float"),
+		"cl_half4": (4, "half"),
 		"cl_float4": (4, "float"),
 		"cl_double4": (4, "double"),
 		"cl_char8": (8, "char"),
@@ -111,7 +111,7 @@ class CodeEmitter:
 		"cl_uint8": (8, "unsigned int"),
 		"cl_long8": (8, "long"),
 		"cl_ulong8": (8, "unsigned long"),
-		"cl_half8": (8, "float"),
+		"cl_half8": (8, "half"),
 		"cl_float8": (8, "float"),
 		"cl_double8": (8, "double"),
 		"cl_char16": (16, "char"),
@@ -122,7 +122,7 @@ class CodeEmitter:
 		"cl_uint16": (16, "unsigned int"),
 		"cl_long16": (16, "long"),
 		"cl_ulong16": (16, "unsigned long"),
-		"cl_half16": (16, "float"),
+		"cl_half16": (16, "half"),
 		"cl_float16": (16, "float"),
 		"cl_double16": (16, "double")
 	}
@@ -352,6 +352,7 @@ class CodeEmitter:
 			if "profile" in self._xmlRoot.attrib and "yes" == self._xmlRoot.attrib["profile"]:
 				f.write(
 					(
+						'	long totalTime;\n'
 						'	struct timeval tThen, tNow, tDelta, tExecTime;\n'
 						'	timerclear(&tExecTime);\n'
 					)
@@ -1121,7 +1122,7 @@ class CodeEmitter:
 				f.write(
 					(
 						'	/* Print profiling results */\n'
-						'	long totalTime = (1000000 * tExecTime.tv_sec) + tExecTime.tv_usec;\n'
+						'	totalTime = (1000000 * tExecTime.tv_sec) + tExecTime.tv_usec;\n'
 						'	printf("Elapsed time spent on kernels: %ld us; Average time per iteration: %lf us.\\n", totalTime, totalTime / (double) i);\n'
 					)
 				)
